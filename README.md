@@ -1,1 +1,0 @@
-# open-campus-game
