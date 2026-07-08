@@ -18,6 +18,59 @@ let keys = {};
 let score = 0;
 let timeLeft = 30;
 let gameOver = false;
+let attackName = "";
+let attackType = "";
+let attackColor = "yellow";
+
+function setupAttack(){
+
+    attackName = prompt("攻撃名を入力してください");
+
+    if(!attackName){
+        attackName = "ファイヤーブレイク";
+    }
+
+    if(
+        attackName.includes("炎") ||
+        attackName.includes("火") ||
+        attackName.includes("ファイヤ")
+    ){
+        attackType = "炎";
+        attackColor = "red";
+    }
+
+    else if(
+        attackName.includes("雷") ||
+        attackName.includes("サンダ")
+    ){
+        attackType = "雷";
+        attackColor = "yellow";
+    }
+
+    else if(
+        attackName.includes("氷") ||
+        attackName.includes("アイス")
+    ){
+        attackType = "氷";
+        attackColor = "cyan";
+    }
+
+    else if(
+        attackName.includes("風") ||
+        attackName.includes("トルネード")
+    ){
+        attackType = "風";
+        attackColor = "lime";
+    }
+
+    else{
+
+        attackType = "ビーム";
+        attackColor = "magenta";
+
+    }
+
+}
 
 document.addEventListener("keydown", (e) => {
     keys[e.key.toLowerCase()] = true;
@@ -120,7 +173,7 @@ function draw() {
         ctx.fillRect(enemy.x, enemy.y, enemy.size, enemy.size);
     }
 
-    ctx.strokeStyle = "yellow";
+    ctx.strokeStyle = attackColor;
     ctx.lineWidth = 5;
     for (let attack of attacks) {
         ctx.beginPath();
@@ -132,6 +185,8 @@ function draw() {
     ctx.font = "28px sans-serif";
     ctx.fillText("TIME: " + timeLeft, 20, 40);
     ctx.fillText("SCORE: " + score, 20, 80);
+    ctx.fillText("ATTACK : " + attackName,20,120);
+　　ctx.fillText("TYPE : " + attackType,20,160);
 
     if (gameOver) {
         ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
@@ -158,6 +213,7 @@ function gameLoop() {
     requestAnimationFrame(gameLoop);
 }
 
+setupAttack();
 gameLoop();
 
 setInterval(() => {
