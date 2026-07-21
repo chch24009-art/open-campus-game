@@ -247,7 +247,7 @@ let bossWarn = 0;
 
 const DRONE_ORBIT = 70;
 const DRONE_FIRE_RATE = 30;
-const BULLET_DAMAGE = 2;
+const BULLET_DAMAGE = 3;
 
 function resetGame() {
     player = {
@@ -387,6 +387,25 @@ function nearestEnemy(x, y) {
     return best;
 }
 
+// ターゲティングAI：群れの中心（周囲120px以内に仲間が一番多い敵）を探す
+function densestEnemy() {
+    let best = null;
+    let bestCount = -1;
+    for (let e of enemies) {
+        let count = 0;
+        for (let o of enemies) {
+            let dx = o.x - e.x;
+            let dy = o.y - e.y;
+            if (dx * dx + dy * dy < 120 * 120) count++;
+        }
+        if (count > bestCount) {
+            bestCount = count;
+            best = e;
+        }
+    }
+    return best;
+}
+
 // =========================
 // 属性攻撃（技名で決まる）
 // =========================
@@ -408,10 +427,23 @@ function createAttack() {
     }
 }
 
-// 炎：8方向に火の玉（威力2）
+// 炎：敵が密集している方向へ扇状に火の玉（威力3）
 function createFireAttack(x, y) {
+    let target = densestEnemy();
+    let baseAngle;
+
+    if (target) {
+        baseAngle = Math.atan2(
+            (target.y + target.size / 2) - y,
+            (target.x + target.size / 2) - x
+        );
+    } else {
+        baseAngle = Math.random() * Math.PI * 2;
+    }
+
+    // 群れの方向を中心に120度の扇で8発
     for (let i = 0; i < 8; i++) {
-        let angle = (Math.PI * 2 / 8) * i;
+        let angle = baseAngle + (i - 3.5) / 7 * (Math.PI * 2 / 3);
         attacks.push({
             type: "fire",
             x: x, y: y,
@@ -422,12 +454,18 @@ function createFireAttack(x, y) {
     }
 }
 
-// 雷：近い敵5体に落雷（威力3）
+// 雷：群れの中心付近の敵5体に落雷（威力4）
 function createLightningAttack(x, y) {
+    let center = densestEnemy();
+    if (!center) return;
+
+    let cx = center.x;
+    let cy = center.y;
+
     let targets = [...enemies]
         .sort((a, b) => {
-            let da = Math.hypot(a.x - player.x, a.y - player.y);
-            let db = Math.hypot(b.x - player.x, b.y - player.y);
+            let da = Math.hypot(a.x - cx, a.y - cy);
+            let db = Math.hypot(b.x - cx, b.y - cy);
             return da - db;
         })
         .slice(0, 5);
@@ -443,7 +481,7 @@ function createLightningAttack(x, y) {
 
         let index = enemies.indexOf(target);
         if (index !== -1) {
-            damageEnemy(index, 3);
+            damageEnemy(index, 4);
         }
     }
 }
@@ -471,9 +509,9 @@ function createWindAttack(x, y) {
     });
 }
 
-// ビーム：一番近い敵の方向へ貫通ビーム（威力3）
+// ビーム：敵が密集している方向へ貫通ビーム（威力4）
 function createBeamAttack(x, y) {
-    let target = nearestEnemy(x, y);
+    let target = densestEnemy();
     if (!target) return;
 
     let dx = (target.x + target.size / 2) - x;
@@ -495,7 +533,7 @@ function createBeamAttack(x, y) {
         let forward = ex * ux + ey * uy;
         let side = Math.abs(ex * uy - ey * ux);
         if (forward > 0 && side < 25) {
-            damageEnemy(i, 3);
+            damageEnemy(i, 4);
         }
     }
 }
@@ -512,7 +550,10 @@ function updateDrones() {
 
         d.cooldown--;
         if (d.cooldown <= 0) {
-            let target = nearestEnemy(d.x, d.y);
+            // 1機目は一番近い敵（守り）、2機目は群れの中心（攻め）を狙う
+            let target = (d === drones[0])
+                ? nearestEnemy(d.x, d.y)
+                : (densestEnemy() || nearestEnemy(d.x, d.y));
             if (target) {
                 let dx = (target.x + target.size / 2) - d.x;
                 let dy = (target.y + target.size / 2) - d.y;
@@ -592,7 +633,7 @@ function update() {
                 let ey = (enemies[j].y + enemies[j].size / 2) - a.y;
                 if (Math.hypot(ex, ey) < enemies[j].size / 2 + a.radius) {
                     if (a.type === "ice") enemies[j].slowTime = 120;
-                    damageEnemy(j, a.type === "fire" ? 2 : 1);
+                    damageEnemy(j, a.type === "fire" ? 3 : 2);
                     a.life = 0;
                     break;
                 }
@@ -612,7 +653,7 @@ function update() {
                 );
                 if (d < a.radius + 15 && d > a.radius - 20) {
                     e.hitCooldown = 20;
-                    damageEnemy(j, 2);
+                    damageEnemy(j, 3);
                 }
             }
         }
