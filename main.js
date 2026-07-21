@@ -988,7 +988,7 @@ setInterval(() => {
         timeLeft--;
 
         // 残り10秒でボス出現
-        if (timeLeft === 10 && !bossSpawned) {
+        if (timeLeft === 15 && !bossSpawned) {
             bossSpawned = true;
             spawnBoss();
         }
