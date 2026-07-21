@@ -8,7 +8,7 @@ canvas.height = window.innerHeight;
 let state = "start";
 let dead = false;
 
-const TOTAL_TIME = 60;
+const TOTAL_TIME = 100;
 
 // =========================
 // 画面（DOM）を作る
