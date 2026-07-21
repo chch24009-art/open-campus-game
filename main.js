@@ -70,6 +70,7 @@ ui.innerHTML = `
 
 <div id="resultScreen" class="screen" style="display:none">
     <h2>AI生成結果</h2>
+    <p id="genHeroEmoji" style="font-size:70px; margin:0"></p>
     <p class="gen" id="genHero"></p>
     <p class="gen" id="genAttack"></p>
     <p class="gen" id="genEnemy1"></p>
@@ -129,6 +130,23 @@ const HERO_TITLES = {
     "ビーム": ["星光の戦士", "銀河の守護者", "光速の勇者"]
 };
 const HERO_NAMES = ["レン", "ソラ", "カイ", "ユウキ", "アカリ", "ヒカル", "ミナト", "リク", "ツバサ", "ハヤテ"];
+
+// 属性ごとの主人公の見た目とオーラの色
+const HERO_EMOJI = {
+    "炎": "🦸",
+    "雷": "🥷",
+    "氷": "🧙",
+    "風": "🧝",
+    "ビーム": "👨‍🚀"
+};
+const ELEMENT_COLORS = {
+    "炎": "orange",
+    "雷": "yellow",
+    "氷": "cyan",
+    "風": "lime",
+    "ビーム": "magenta"
+};
+let heroEmoji = "🚀";
 const ENEMY_ADJ = ["漆黒の", "混沌の", "深淵の", "暴走", "呪われし", "鋼鉄の", "冥界の", "狂乱の"];
 const ENEMY_NOUN = {
     normal: ["インベーダー", "スライム", "ウォッチャー", "クリーパー"],
@@ -143,6 +161,7 @@ function pick(arr) {
 
 function generateNames() {
     heroName = pick(HERO_TITLES[attackType]) + "・" + pick(HERO_NAMES);
+    heroEmoji = HERO_EMOJI[attackType];
     enemyNames.normal = pick(ENEMY_ADJ) + pick(ENEMY_NOUN.normal);
     enemyNames.fast = pick(ENEMY_ADJ) + pick(ENEMY_NOUN.fast);
     enemyNames.tank = pick(ENEMY_ADJ) + pick(ENEMY_NOUN.tank);
@@ -181,6 +200,7 @@ function decide() {
         classifyAttack(attackName);
         generateNames();
 
+        document.getElementById("genHeroEmoji").textContent = heroEmoji;
         document.getElementById("genHero").textContent = "主人公名：" + heroName;
         document.getElementById("genAttack").textContent = "攻撃タイプ：" + attackType + "系（" + attackName + "）";
         document.getElementById("genEnemy1").textContent = "敵キャラ名1：👾 " + enemyNames.normal;
@@ -202,6 +222,7 @@ document.getElementById("attackInput").addEventListener("keydown", (e) => {
 
 document.getElementById("playBtn").addEventListener("click", () => {
     showScreen(null);
+    if (document.activeElement) document.activeElement.blur();
     resetGame();
     state = "playing";
 });
@@ -257,13 +278,16 @@ function resetGame() {
 // 入力
 // =========================
 
+// e.code（物理キー）で判定するので、日本語入力がONのままでも動く
 document.addEventListener("keydown", (e) => {
     if (e.target.tagName === "INPUT") return;
-    keys[e.key.toLowerCase()] = true;
+    keys[e.code] = true;
+    if (state === "playing") e.preventDefault();   // 変換候補が出るのを防ぐ
 });
 
 document.addEventListener("keyup", (e) => {
-    keys[e.key.toLowerCase()] = false;
+    if (e.target.tagName === "INPUT") return;
+    keys[e.code] = false;
 });
 
 canvas.addEventListener("click", () => {
@@ -511,10 +535,10 @@ function updateDrones() {
 function update() {
     if (state !== "playing") return;
 
-    if (keys["w"] || keys["arrowup"]) player.y -= player.speed;
-    if (keys["s"] || keys["arrowdown"]) player.y += player.speed;
-    if (keys["a"] || keys["arrowleft"]) player.x -= player.speed;
-    if (keys["d"] || keys["arrowright"]) player.x += player.speed;
+    if (keys["KeyW"] || keys["ArrowUp"]) player.y -= player.speed;
+    if (keys["KeyS"] || keys["ArrowDown"]) player.y += player.speed;
+    if (keys["KeyA"] || keys["ArrowLeft"]) player.x -= player.speed;
+    if (keys["KeyD"] || keys["ArrowRight"]) player.x += player.speed;
 
     player.x = Math.max(0, Math.min(canvas.width - player.size, player.x));
     player.y = Math.max(0, Math.min(canvas.height - player.size, player.y));
@@ -668,9 +692,16 @@ function drawGame() {
         }
     }
 
-    // プレイヤー
+    // プレイヤー（属性色のオーラ付き）
+    ctx.fillStyle = ELEMENT_COLORS[attackType] || "white";
+    ctx.globalAlpha = 0.25;
+    ctx.beginPath();
+    ctx.arc(playerCenterX(), playerCenterY(), player.size * 0.9, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+
     ctx.font = player.size + "px sans-serif";
-    ctx.fillText("🚀", playerCenterX(), playerCenterY());
+    ctx.fillText(heroEmoji, playerCenterX(), playerCenterY());
 
     // HPバー
     let barW = 60;
