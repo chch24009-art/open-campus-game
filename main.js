@@ -89,6 +89,109 @@ function showScreen(id) {
 }
 
 // =========================
+// サウンド（Web Audio APIで生成、音声ファイル不要）
+// =========================
+
+let audioCtx = null;
+let masterGain = null;
+let bgmTimer = null;
+let bgmStep = 0;
+let lastKillSound = 0;
+
+function initAudio() {
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        masterGain = audioCtx.createGain();
+        masterGain.gain.value = 0.3;
+        masterGain.connect(audioCtx.destination);
+    }
+    if (audioCtx.state === "suspended") audioCtx.resume();
+}
+
+// 音を1つ鳴らす（freqからslideToへ音程が変化）
+function tone(freq, dur, type, vol, slideTo, delay) {
+    if (!audioCtx) return;
+    let t = audioCtx.currentTime + (delay || 0);
+    let osc = audioCtx.createOscillator();
+    let g = audioCtx.createGain();
+    osc.type = type || "square";
+    osc.frequency.setValueAtTime(freq, t);
+    if (slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, t + dur);
+    g.gain.setValueAtTime(vol || 0.3, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    osc.connect(g);
+    g.connect(masterGain);
+    osc.start(t);
+    osc.stop(t + dur);
+}
+
+// ノイズ音（爆発・風など）
+function noise(dur, vol, filterFreq) {
+    if (!audioCtx) return;
+    let t = audioCtx.currentTime;
+    let len = Math.floor(audioCtx.sampleRate * dur);
+    let buf = audioCtx.createBuffer(1, len, audioCtx.sampleRate);
+    let data = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+    let src = audioCtx.createBufferSource();
+    src.buffer = buf;
+    let filter = audioCtx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.value = filterFreq || 1000;
+    let g = audioCtx.createGain();
+    g.gain.setValueAtTime(vol || 0.3, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+    src.connect(filter);
+    filter.connect(g);
+    g.connect(masterGain);
+    src.start(t);
+}
+
+// 効果音
+const SFX = {
+    "炎": () => noise(0.25, 0.25, 800),
+    "雷": () => { noise(0.12, 0.3, 4000); tone(120, 0.2, "sawtooth", 0.2); },
+    "氷": () => tone(1200, 0.15, "sine", 0.15, 400),
+    "風": () => noise(0.4, 0.15, 500),
+    "ビーム": () => tone(900, 0.25, "sawtooth", 0.18, 150),
+    kill: () => tone(600, 0.08, "square", 0.12, 1200),
+    bossWarn: () => {
+        tone(440, 0.3, "square", 0.25);
+        tone(330, 0.3, "square", 0.25, null, 0.35);
+        tone(440, 0.3, "square", 0.25, null, 0.7);
+    },
+    gameover: () => {
+        tone(400, 0.3, "triangle", 0.3, 200);
+        tone(300, 0.5, "triangle", 0.3, 120, 0.3);
+    },
+    survived: () => {
+        [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.18, "triangle", 0.25, null, i * 0.15));
+    }
+};
+
+// 敵撃破音（鳴りすぎ防止つき）
+function playKill() {
+    if (!audioCtx) return;
+    if (audioCtx.currentTime - lastKillSound < 0.06) return;
+    lastKillSound = audioCtx.currentTime;
+    SFX.kill();
+}
+
+// シンプルなループBGM（プレイ中だけ鳴る）
+const BGM_NOTES = [110, 110, 165, 110, 131, 131, 196, 165];
+function startBGM() {
+    if (bgmTimer) return;
+    bgmTimer = setInterval(() => {
+        if (state !== "playing" || !audioCtx) return;
+        let f = BGM_NOTES[bgmStep % BGM_NOTES.length];
+        tone(f, 0.15, "triangle", 0.1);
+        if (bgmStep % 2 === 0) tone(f * 2, 0.1, "square", 0.04);
+        if (timeLeft <= 10) noise(0.03, 0.08, 6000);   // ラスト10秒は焦る音
+        bgmStep++;
+    }, 250);
+}
+
+// =========================
 // AI生成（攻撃名の分類＋名前生成）
 // =========================
 
@@ -181,6 +284,7 @@ function getTitle(s) {
 // =========================
 
 document.getElementById("startBtn").addEventListener("click", () => {
+    initAudio();   // 音はユーザー操作の後でないと鳴らせないルールのためここで準備
     state = "input";
     showScreen("inputScreen");
     document.getElementById("attackInput").focus();
@@ -223,6 +327,8 @@ document.getElementById("attackInput").addEventListener("keydown", (e) => {
 document.getElementById("playBtn").addEventListener("click", () => {
     showScreen(null);
     if (document.activeElement) document.activeElement.blur();
+    initAudio();
+    startBGM();
     resetGame();
     state = "playing";
 });
@@ -344,6 +450,7 @@ function spawnEnemy() {
 
 function spawnBoss() {
     bossWarn = 90;
+    SFX.bossWarn();
     enemies.push({
         x: canvas.width / 2 - 40, y: -100,
         size: 80, speed: 1.8,
@@ -366,6 +473,7 @@ function damageEnemy(index, dmg) {
     if (e.hp <= 0) {
         enemies.splice(index, 1);
         score += e.point || 1;
+        playKill();
     }
 }
 
@@ -413,6 +521,8 @@ function densestEnemy() {
 function createAttack() {
     let cx = playerCenterX();
     let cy = playerCenterY();
+
+    if (SFX[attackType]) SFX[attackType]();
 
     if (attackType === "炎") {
         createFireAttack(cx, cy);
@@ -611,6 +721,7 @@ function update() {
         player.hp = 0;
         dead = true;
         state = "over";
+        SFX.gameover();
     }
 
     weaponCooldown--;
@@ -885,6 +996,7 @@ setInterval(() => {
         if (timeLeft <= 0) {
             timeLeft = 0;
             state = "over";
+            SFX.survived();
         }
     }
 }, 1000);
