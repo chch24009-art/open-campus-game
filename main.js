@@ -4,55 +4,207 @@ const ctx = canvas.getContext("2d");
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-// ゲームの状態: "title"（技名入力） / "playing" / "over"
-let state = "title";
+// ゲームの状態: "start" / "input" / "result" / "playing" / "over"
+let state = "start";
 let dead = false;
 
+const TOTAL_TIME = 60;
+
 // =========================
-// 技名をAIが分類
+// 画面（DOM）を作る
+// =========================
+
+const ui = document.createElement("div");
+ui.innerHTML = `
+<style>
+.screen {
+    position: fixed;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 24px;
+    color: white;
+    font-family: sans-serif;
+    background: rgba(0, 0, 0, 0.88);
+    text-align: center;
+    z-index: 10;
+}
+.screen h1 { font-size: 52px; margin: 0; }
+.screen h2 { font-size: 36px; margin: 0; }
+.screen p { font-size: 22px; margin: 0; color: #ccc; }
+.screen .gen { font-size: 26px; color: white; }
+.screen button {
+    font-size: 26px;
+    padding: 14px 60px;
+    border: none;
+    border-radius: 10px;
+    background: orange;
+    color: black;
+    font-weight: bold;
+    cursor: pointer;
+}
+.screen button:hover { background: gold; }
+.screen input {
+    font-size: 24px;
+    padding: 12px 20px;
+    border-radius: 10px;
+    border: 3px solid orange;
+    width: min(400px, 80vw);
+    text-align: center;
+}
+</style>
+
+<div id="startScreen" class="screen">
+    <h1>生成AIサバイバルゲーム</h1>
+    <p>攻撃名を入力して、AIが決めた攻撃で敵を倒そう！</p>
+    <button id="startBtn">START</button>
+</div>
+
+<div id="inputScreen" class="screen" style="display:none">
+    <h2>攻撃名を入力してください</h2>
+    <input id="attackInput" placeholder="例：ファイヤーブレイク" maxlength="20">
+    <button id="decideBtn">決定</button>
+</div>
+
+<div id="resultScreen" class="screen" style="display:none">
+    <h2>AI生成結果</h2>
+    <p class="gen" id="genHero"></p>
+    <p class="gen" id="genAttack"></p>
+    <p class="gen" id="genEnemy1"></p>
+    <p class="gen" id="genEnemy2"></p>
+    <p class="gen" id="genEnemy3"></p>
+    <button id="playBtn">ゲーム開始</button>
+</div>
+`;
+document.body.appendChild(ui);
+
+function showScreen(id) {
+    for (let s of document.querySelectorAll(".screen")) {
+        s.style.display = "none";
+    }
+    if (id) document.getElementById(id).style.display = "flex";
+}
+
+// =========================
+// AI生成（攻撃名の分類＋名前生成）
 // =========================
 
 let attackName = "";
 let attackType = "";
-let attackColor = "yellow";
+let heroName = "";
+let enemyNames = { normal: "", fast: "", tank: "", boss: "" };
 
 function classifyAttack(name) {
     if (
-        name.includes("炎") ||
-        name.includes("火") ||
-        name.includes("ファイヤ") ||
-        name.includes("フレイム")
+        name.includes("炎") || name.includes("火") ||
+        name.includes("ファイヤ") || name.includes("フレイム")
     ) {
         attackType = "炎";
-        attackColor = "orange";
     } else if (
-        name.includes("雷") ||
-        name.includes("サンダ") ||
-        name.includes("電")
+        name.includes("雷") || name.includes("サンダ") || name.includes("電")
     ) {
         attackType = "雷";
-        attackColor = "yellow";
     } else if (
-        name.includes("氷") ||
-        name.includes("アイス") ||
-        name.includes("雪") ||
-        name.includes("フリーズ")
+        name.includes("氷") || name.includes("アイス") ||
+        name.includes("雪") || name.includes("フリーズ")
     ) {
         attackType = "氷";
-        attackColor = "cyan";
     } else if (
-        name.includes("風") ||
-        name.includes("トルネード") ||
-        name.includes("嵐") ||
-        name.includes("ウインド")
+        name.includes("風") || name.includes("トルネード") ||
+        name.includes("嵐") || name.includes("ウインド")
     ) {
         attackType = "風";
-        attackColor = "lime";
     } else {
         attackType = "ビーム";
-        attackColor = "magenta";
     }
 }
+
+const HERO_TITLES = {
+    "炎": ["紅蓮の勇者", "灼熱の剣士", "炎帝"],
+    "雷": ["迅雷の剣士", "雷鳴の勇者", "紫電の使い手"],
+    "氷": ["氷結の魔導士", "白銀の騎士", "絶対零度の支配者"],
+    "風": ["疾風の狩人", "嵐を呼ぶ者", "天翔の剣士"],
+    "ビーム": ["星光の戦士", "銀河の守護者", "光速の勇者"]
+};
+const HERO_NAMES = ["レン", "ソラ", "カイ", "ユウキ", "アカリ", "ヒカル", "ミナト", "リク", "ツバサ", "ハヤテ"];
+const ENEMY_ADJ = ["漆黒の", "混沌の", "深淵の", "暴走", "呪われし", "鋼鉄の", "冥界の", "狂乱の"];
+const ENEMY_NOUN = {
+    normal: ["インベーダー", "スライム", "ウォッチャー", "クリーパー"],
+    fast: ["ファントム", "レイス", "シェイド", "スペクター"],
+    tank: ["オーガ", "ゴーレム", "ベヒーモス", "ジャガーノート"],
+    boss: ["竜王", "魔竜", "終焉竜", "冥竜"]
+};
+
+function pick(arr) {
+    return arr[Math.floor(Math.random() * arr.length)];
+}
+
+function generateNames() {
+    heroName = pick(HERO_TITLES[attackType]) + "・" + pick(HERO_NAMES);
+    enemyNames.normal = pick(ENEMY_ADJ) + pick(ENEMY_NOUN.normal);
+    enemyNames.fast = pick(ENEMY_ADJ) + pick(ENEMY_NOUN.fast);
+    enemyNames.tank = pick(ENEMY_ADJ) + pick(ENEMY_NOUN.tank);
+    enemyNames.boss = pick(ENEMY_ADJ) + pick(ENEMY_NOUN.boss);
+}
+
+function getTitle(s) {
+    if (s >= 150) return "伝説のAIマスター";
+    if (s >= 100) return "超絶サバイバー";
+    if (s >= 60) return "熟練モンスターハンター";
+    if (s >= 30) return "見習い勇者";
+    return "ひよっこ冒険者";
+}
+
+// =========================
+// 画面フロー
+// =========================
+
+document.getElementById("startBtn").addEventListener("click", () => {
+    state = "input";
+    showScreen("inputScreen");
+    document.getElementById("attackInput").focus();
+});
+
+function decide() {
+    let name = document.getElementById("attackInput").value.trim();
+    if (!name) name = "ファイヤーブレイク";
+    attackName = name;
+
+    // AIが考えている演出
+    let btn = document.getElementById("decideBtn");
+    btn.textContent = "AIが分類中…";
+    btn.disabled = true;
+
+    setTimeout(() => {
+        classifyAttack(attackName);
+        generateNames();
+
+        document.getElementById("genHero").textContent = "主人公名：" + heroName;
+        document.getElementById("genAttack").textContent = "攻撃タイプ：" + attackType + "系（" + attackName + "）";
+        document.getElementById("genEnemy1").textContent = "敵キャラ名1：👾 " + enemyNames.normal;
+        document.getElementById("genEnemy2").textContent = "敵キャラ名2：👻 " + enemyNames.fast;
+        document.getElementById("genEnemy3").textContent = "敵キャラ名3：👹 " + enemyNames.tank;
+
+        btn.textContent = "決定";
+        btn.disabled = false;
+
+        state = "result";
+        showScreen("resultScreen");
+    }, 800);
+}
+
+document.getElementById("decideBtn").addEventListener("click", decide);
+document.getElementById("attackInput").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") decide();
+});
+
+document.getElementById("playBtn").addEventListener("click", () => {
+    showScreen(null);
+    resetGame();
+    state = "playing";
+});
 
 // =========================
 // ゲームデータ
@@ -61,14 +213,14 @@ function classifyAttack(name) {
 let player = {};
 let drones = [];
 let enemies = [];
-let attacks = [];   // 属性攻撃
-let bullets = [];   // ドローンの弾
-let popups = [];    // ダメージ数字
+let attacks = [];
+let bullets = [];
+let popups = [];
 let keys = {};
 
 let weaponCooldown = 0;
 let score = 0;
-let timeLeft = 30;
+let timeLeft = TOTAL_TIME;
 let bossSpawned = false;
 let bossWarn = 0;
 
@@ -95,19 +247,10 @@ function resetGame() {
     popups = [];
     weaponCooldown = 0;
     score = 0;
-    timeLeft = 30;
+    timeLeft = TOTAL_TIME;
     bossSpawned = false;
     bossWarn = 0;
     dead = false;
-}
-
-function startGame() {
-    let name = prompt("攻撃名を入力してください（例：ファイヤーブレイク）");
-    if (!name) name = "ファイヤーブレイク";
-    attackName = name;
-    classifyAttack(name);
-    resetGame();
-    state = "playing";
 }
 
 // =========================
@@ -115,11 +258,8 @@ function startGame() {
 // =========================
 
 document.addEventListener("keydown", (e) => {
+    if (e.target.tagName === "INPUT") return;
     keys[e.key.toLowerCase()] = true;
-
-    if (state === "title" && (e.key === "Enter" || e.key === " ")) {
-        startGame();
-    }
 });
 
 document.addEventListener("keyup", (e) => {
@@ -127,10 +267,9 @@ document.addEventListener("keyup", (e) => {
 });
 
 canvas.addEventListener("click", () => {
-    if (state === "title") {
-        startGame();
-    } else if (state === "over") {
-        state = "title";
+    if (state === "over") {
+        state = "start";
+        showScreen("startScreen");
     }
 });
 
@@ -158,17 +297,14 @@ function spawnEnemy() {
         y = Math.random() * canvas.height;
     }
 
-    // 敵の種類を確率で決める
+    let elapsed = TOTAL_TIME - timeLeft;
     let r = Math.random();
     let type;
     if (r < 0.25) {
-        // 速いけど弱い
         type = { emoji: "👻", size: 24, speed: 4.5, hp: 1, dmg: 0.1, point: 1 };
-    } else if (r < 0.4 && timeLeft <= 25) {
-        // 遅いけど硬い（開始5秒後から出る）
+    } else if (r < 0.4 && elapsed >= 5) {
         type = { emoji: "👹", size: 44, speed: 1.3, hp: 10, dmg: 0.4, point: 3 };
     } else {
-        // ふつう
         type = { emoji: "👾", size: 30, speed: 2.5, hp: 3, dmg: 0.15, point: 1 };
     }
 
@@ -329,7 +465,6 @@ function createBeamAttack(x, y) {
         life: 15
     });
 
-    // 直線上の敵をまとめてダメージ（貫通）
     for (let i = enemies.length - 1; i >= 0; i--) {
         let ex = (enemies[i].x + enemies[i].size / 2) - x;
         let ey = (enemies[i].y + enemies[i].size / 2) - y;
@@ -384,12 +519,11 @@ function update() {
     player.x = Math.max(0, Math.min(canvas.width - player.size, player.x));
     player.y = Math.max(0, Math.min(canvas.height - player.size, player.y));
 
-    // 敵の移動＋接触ダメージ
     for (let enemy of enemies) {
         let sp = enemy.speed;
         if (enemy.slowTime > 0) {
             enemy.slowTime--;
-            sp = enemy.speed * 0.4;   // 氷で凍って遅い
+            sp = enemy.speed * 0.4;
         }
 
         let dx = player.x - enemy.x;
@@ -414,16 +548,14 @@ function update() {
         state = "over";
     }
 
-    // 属性攻撃を一定間隔で発動
     weaponCooldown--;
     if (weaponCooldown <= 0) {
         createAttack();
-        weaponCooldown = 42;   // 約0.7秒
+        weaponCooldown = 42;
     }
 
     updateDrones();
 
-    // 属性攻撃の移動と当たり判定
     for (let a of attacks) {
         a.life--;
 
@@ -463,7 +595,6 @@ function update() {
     }
     attacks = attacks.filter(a => a.life > 0);
 
-    // ドローンの弾
     for (let i = bullets.length - 1; i >= 0; i--) {
         let b = bullets[i];
         b.x += b.vx;
@@ -493,28 +624,10 @@ function update() {
 // 描画
 // =========================
 
-function drawTitle() {
-    ctx.fillStyle = "white";
-    ctx.textAlign = "center";
-    ctx.font = "bold 60px sans-serif";
-    ctx.fillText("AI SURVIVAL GAME", canvas.width / 2, canvas.height / 3);
-
-    ctx.font = "30px sans-serif";
-    ctx.fillText("画面をクリックして 技名 を入力するとスタート！", canvas.width / 2, canvas.height / 2);
-
-    ctx.font = "24px sans-serif";
-    ctx.fillStyle = "#aaa";
-    ctx.fillText("技名からAIが属性を判定するよ", canvas.width / 2, canvas.height / 2 + 50);
-    ctx.fillText("🔥炎  ⚡雷  ❄️氷  🌪️風  ✨ビーム", canvas.width / 2, canvas.height / 2 + 90);
-
-    ctx.textAlign = "left";
-}
-
 function drawGame() {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
 
-    // 属性攻撃
     for (let a of attacks) {
         if (a.type === "fire") {
             ctx.fillStyle = "orange";
@@ -571,7 +684,7 @@ function drawGame() {
     // 敵
     for (let e of enemies) {
         ctx.font = e.size + "px sans-serif";
-        ctx.globalAlpha = e.slowTime > 0 ? 0.6 : 1;   // 凍ってる敵は半透明
+        ctx.globalAlpha = e.slowTime > 0 ? 0.6 : 1;
         ctx.fillText(e.emoji, e.x + e.size / 2, e.y + e.size / 2);
         ctx.globalAlpha = 1;
 
@@ -615,16 +728,16 @@ function drawGame() {
     ctx.font = "26px sans-serif";
     ctx.fillText("TIME: " + timeLeft, 20, 40);
     ctx.fillText("SCORE: " + score, 20, 75);
-    ctx.fillText("技名: " + attackName, 20, 110);
-    ctx.fillText("属性: " + attackType, 20, 145);
+    ctx.fillText("主人公: " + heroName, 20, 110);
+    ctx.fillText("技名: " + attackName + "（" + attackType + "系）", 20, 145);
 
     // ボス出現の警告
     if (bossWarn > 0) {
         ctx.textAlign = "center";
         ctx.globalAlpha = (Math.floor(bossWarn / 10) % 2 === 0) ? 1 : 0.3;
         ctx.fillStyle = "red";
-        ctx.font = "bold 60px sans-serif";
-        ctx.fillText("⚠️ BOSS出現 ⚠️", canvas.width / 2, canvas.height / 3);
+        ctx.font = "bold 44px sans-serif";
+        ctx.fillText("⚠️ BOSS「" + enemyNames.boss + "」出現 ⚠️", canvas.width / 2, canvas.height / 3);
         ctx.globalAlpha = 1;
         ctx.textAlign = "left";
     }
@@ -640,15 +753,19 @@ function drawOver() {
     ctx.textAlign = "center";
 
     ctx.font = "50px sans-serif";
-    ctx.fillText(dead ? "GAME OVER" : "SURVIVED!", canvas.width / 2, canvas.height / 2 - 60);
+    ctx.fillText(dead ? "GAME OVER" : "SURVIVED!", canvas.width / 2, canvas.height / 2 - 100);
 
     ctx.font = "36px sans-serif";
-    ctx.fillText("SCORE: " + score, canvas.width / 2, canvas.height / 2);
+    ctx.fillText("SCORE: " + score, canvas.width / 2, canvas.height / 2 - 40);
 
-    ctx.font = "28px sans-serif";
-    ctx.fillText(dead ? "敵に食べられた…" : "30秒生き残った！", canvas.width / 2, canvas.height / 2 + 50);
-    ctx.fillText("使用した技：" + attackName, canvas.width / 2, canvas.height / 2 + 90);
-    ctx.fillText("クリックでタイトルへ", canvas.width / 2, canvas.height / 2 + 140);
+    ctx.font = "32px sans-serif";
+    ctx.fillStyle = "gold";
+    ctx.fillText("称号：" + getTitle(score), canvas.width / 2, canvas.height / 2 + 10);
+
+    ctx.fillStyle = "white";
+    ctx.font = "26px sans-serif";
+    ctx.fillText("主人公：" + heroName + "　使用した技：" + attackName, canvas.width / 2, canvas.height / 2 + 60);
+    ctx.fillText("クリックでタイトルへ", canvas.width / 2, canvas.height / 2 + 110);
 
     ctx.textAlign = "left";
 }
@@ -656,11 +773,9 @@ function drawOver() {
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    if (state === "title") {
-        drawTitle();
-    } else if (state === "playing") {
+    if (state === "playing") {
         drawGame();
-    } else {
+    } else if (state === "over") {
         drawOver();
     }
 }
