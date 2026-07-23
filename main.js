@@ -8,7 +8,7 @@ canvas.height = window.innerHeight;
 let state = "start";
 let dead = false;
 
-const TOTAL_TIME = 100;
+const TOTAL_TIME = 60;
 
 // =========================
 // 画面（DOM）を作る
@@ -73,6 +73,7 @@ ui.innerHTML = `
     <p id="genHeroEmoji" style="font-size:70px; margin:0"></p>
     <p class="gen" id="genHero"></p>
     <p class="gen" id="genAttack"></p>
+    <p id="genReason" style="font-size:19px; color:#ffd479; max-width:600px; margin:0 20px"></p>
     <p class="gen" id="genEnemy1"></p>
     <p class="gen" id="genEnemy2"></p>
     <p class="gen" id="genEnemy3"></p>
@@ -197,32 +198,87 @@ function startBGM() {
 
 let attackName = "";
 let attackType = "";
+let attackReason = "";
 let heroName = "";
 let enemyNames = { normal: "", fast: "", tank: "", boss: "" };
 
-function classifyAttack(name) {
-    if (
-        name.includes("炎") || name.includes("火") ||
-        name.includes("ファイヤ") || name.includes("フレイム")
-    ) {
-        attackType = "炎";
-    } else if (
-        name.includes("雷") || name.includes("サンダ") || name.includes("電")
-    ) {
-        attackType = "雷";
-    } else if (
-        name.includes("氷") || name.includes("アイス") ||
-        name.includes("雪") || name.includes("フリーズ")
-    ) {
-        attackType = "氷";
-    } else if (
-        name.includes("風") || name.includes("トルネード") ||
-        name.includes("嵐") || name.includes("ウインド")
-    ) {
-        attackType = "風";
-    } else {
-        attackType = "ビーム";
+// 各属性のキーワード（はっきり一致した場合はこちらを優先）
+const ELEMENT_KEYWORDS = {
+    "炎": ["炎", "火", "ファイヤ", "フレイム", "バーン", "灼", "爆", "熱", "マグマ", "太陽"],
+    "雷": ["雷", "サンダ", "電", "ライトニング", "スパーク", "プラズマ", "閃", "轟"],
+    "氷": ["氷", "アイス", "雪", "フリーズ", "ブリザ", "凍", "冷", "白", "水", "海"],
+    "風": ["風", "トルネード", "嵐", "ウインド", "ゲイル", "疾風", "空", "翼", "斬", "刃"],
+    "ビーム": ["ビーム", "レーザー", "光", "星", "銀河", "宇宙", "波動", "オーラ", "神", "極"]
+};
+
+// 母音・語感から属性を推測するためのヒント
+const VOWEL_ELEMENT = {
+    "a": "炎",   // 開いた強い響き → 炎
+    "i": "雷",   // 鋭い響き → 雷
+    "u": "氷",   // こもった冷たい響き → 氷
+    "e": "風",   // 抜ける響き → 風
+    "o": "ビーム" // 重く伸びる響き → ビーム
+};
+
+// キーワード一致したときの理由文
+function keywordReason(name, kw, type) {
+    return "入力の中に「" + kw + "」が含まれていたため、" + type + "系と判定しました。";
+}
+
+// キーワードが無いときの、それっぽい理由文（属性ごと）
+const GUESS_REASONS = {
+    "炎": ["語感が力強く熱を感じさせるため", "破壊力の高そうな響きを持つため", "勢いのある攻撃的な名前のため"],
+    "雷": ["音が鋭くスピード感があるため", "一瞬で決まりそうな切れ味を感じるため", "電撃のような響きを持つため"],
+    "氷": ["どこか静かで冷たい印象を受けるため", "落ち着いた硬質な語感のため", "澄んだ響きを感じさせるため"],
+    "風": ["軽やかで流れるような響きのため", "素早さを感じさせる名前のため", "空を切るような印象のため"],
+    "ビーム": ["どの属性にも寄らない神秘的な響きのため", "エネルギーを凝縮したような語感のため", "未知の力を感じさせる名前のため"]
+};
+
+// 文字列から安定した数値を作る（同じ入力なら毎回同じ結果に）
+function hashString(s) {
+    let h = 0;
+    for (let i = 0; i < s.length; i++) {
+        h = (h * 31 + s.charCodeAt(i)) >>> 0;
     }
+    return h;
+}
+
+function classifyAttack(name) {
+    let lower = name.toLowerCase();
+
+    // 1. まずキーワードで判定（はっきり分かるものは正確に）
+    for (let type in ELEMENT_KEYWORDS) {
+        for (let kw of ELEMENT_KEYWORDS[type]) {
+            if (name.includes(kw) || lower.includes(kw.toLowerCase())) {
+                attackType = type;
+                attackReason = keywordReason(name, kw, type);
+                return;
+            }
+        }
+    }
+
+    // 2. キーワードが無い場合：母音の出現をスコア化して一番多い属性を選ぶ
+    let scores = { "炎": 0, "雷": 0, "氷": 0, "風": 0, "ビーム": 0 };
+    for (let ch of lower) {
+        if (VOWEL_ELEMENT[ch]) scores[VOWEL_ELEMENT[ch]]++;
+    }
+    // 全角カタカナ等で母音が拾えないときのために、ハッシュで微妙な差をつける
+    let h = hashString(name);
+    let types = Object.keys(scores);
+    scores[types[h % 5]] += 0.5;
+
+    let best = "ビーム";
+    let bestScore = -1;
+    for (let type of types) {
+        if (scores[type] > bestScore) {
+            bestScore = scores[type];
+            best = type;
+        }
+    }
+
+    attackType = best;
+    let reasons = GUESS_REASONS[best];
+    attackReason = reasons[h % reasons.length] + "、" + best + "系と判定しました。";
 }
 
 const HERO_TITLES = {
@@ -307,6 +363,7 @@ function decide() {
         document.getElementById("genHeroEmoji").textContent = heroEmoji;
         document.getElementById("genHero").textContent = "主人公名：" + heroName;
         document.getElementById("genAttack").textContent = "攻撃タイプ：" + attackType + "系（" + attackName + "）";
+        document.getElementById("genReason").textContent = "🤖 AIの判定理由：" + attackReason;
         document.getElementById("genEnemy1").textContent = "敵キャラ名1：👾 " + enemyNames.normal;
         document.getElementById("genEnemy2").textContent = "敵キャラ名2：👻 " + enemyNames.fast;
         document.getElementById("genEnemy3").textContent = "敵キャラ名3：👹 " + enemyNames.tank;
@@ -988,7 +1045,7 @@ setInterval(() => {
         timeLeft--;
 
         // 残り10秒でボス出現
-        if (timeLeft === 15 && !bossSpawned) {
+        if (timeLeft === 10 && !bossSpawned) {
             bossSpawned = true;
             spawnBoss();
         }
