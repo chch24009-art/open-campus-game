@@ -346,7 +346,7 @@ document.getElementById("startBtn").addEventListener("click", () => {
     document.getElementById("attackInput").focus();
 });
 
-function decide() async function decide() {
+async function decide() {
     let name = document.getElementById("attackInput").value.trim();
 
     if (!name) {
