@@ -346,34 +346,92 @@ document.getElementById("startBtn").addEventListener("click", () => {
     document.getElementById("attackInput").focus();
 });
 
-function decide() {
+function decide() async function decide() {
     let name = document.getElementById("attackInput").value.trim();
-    if (!name) name = "ファイヤーブレイク";
+
+    if (!name) {
+        name = "ファイヤーブレイク";
+    }
+
     attackName = name;
 
-    // AIが考えている演出
     let btn = document.getElementById("decideBtn");
-    btn.textContent = "AIが分類中…";
+    btn.textContent = "AIが考え中…";
     btn.disabled = true;
 
-    setTimeout(() => {
-        classifyAttack(attackName);
+    try {
+        const response = await fetch("http://localhost:3000/classify", {
+            method: "POST",
+
+            headers: {
+                "Content-Type": "application/json"
+            },
+
+            body: JSON.stringify({
+                attackName: attackName
+            })
+        });
+
+        if (!response.ok) {
+            throw new Error("サーバーエラー");
+        }
+
+        const data = await response.json();
+
+        attackType = data.attackType;
+
+        attackReason =
+            "OpenAIが「" +
+            attackName +
+            "」を分析して「" +
+            attackType +
+            "」属性と判定しました。";
+
         generateNames();
 
-        document.getElementById("genHeroEmoji").textContent = heroEmoji;
-        document.getElementById("genHero").textContent = "主人公名：" + heroName;
-        document.getElementById("genAttack").textContent = "攻撃タイプ：" + attackType + "系（" + attackName + "）";
-        document.getElementById("genReason").textContent = "🤖 AIの判定理由：" + attackReason;
-        document.getElementById("genEnemy1").textContent = "敵キャラ名1：👾 " + enemyNames.normal;
-        document.getElementById("genEnemy2").textContent = "敵キャラ名2：👻 " + enemyNames.fast;
-        document.getElementById("genEnemy3").textContent = "敵キャラ名3：👹 " + enemyNames.tank;
+        document.getElementById("genHeroEmoji").textContent =
+            heroEmoji;
+
+        document.getElementById("genHero").textContent =
+            "主人公名：" + heroName;
+
+        document.getElementById("genAttack").textContent =
+            "攻撃タイプ：" +
+            attackType +
+            "系（" +
+            attackName +
+            "）";
+
+        document.getElementById("genReason").textContent =
+            "🤖 AIの判定理由：" + attackReason;
+
+        document.getElementById("genEnemy1").textContent =
+            "敵キャラ名1：👾 " + enemyNames.normal;
+
+        document.getElementById("genEnemy2").textContent =
+            "敵キャラ名2：👻 " + enemyNames.fast;
+
+        document.getElementById("genEnemy3").textContent =
+            "敵キャラ名3：👹 " + enemyNames.tank;
+
+        state = "result";
+        showScreen("resultScreen");
+
+    } catch (error) {
+
+        console.error(error);
+
+        alert(
+            "AIとの通信に失敗しました。\n" +
+            "server.jsが起動しているか確認してください。"
+        );
+
+    } finally {
 
         btn.textContent = "決定";
         btn.disabled = false;
 
-        state = "result";
-        showScreen("resultScreen");
-    }, 800);
+    }
 }
 
 document.getElementById("decideBtn").addEventListener("click", decide);
