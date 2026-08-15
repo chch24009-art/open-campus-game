@@ -360,7 +360,7 @@ async function decide() {
     btn.disabled = true;
 
     try {
-        const response = await fetch("http://localhost:3000/classify", {
+        const response = await fetch("https://open-campus-server.onrender.com/classify", {
             method: "POST",
 
             headers: {
