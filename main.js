@@ -380,12 +380,8 @@ async function decide() {
 
         attackType = data.attackType;
 
-        attackReason =
-            "OpenAIが「" +
-            attackName +
-            "」を分析して「" +
-            attackType +
-            "」属性と判定しました。";
+        attackType = data.attackType;
+        attackReason = data.reason;
 
         generateNames();
 
