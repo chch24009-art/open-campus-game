@@ -377,9 +377,7 @@ async function decide() {
         }
 
         const data = await response.json();
-
-        attackType = data.attackType;
-
+        
         attackType = data.attackType;
         attackReason = data.reason;
 
