@@ -511,6 +511,13 @@ document.addEventListener("keyup", (e) => {
 
 canvas.addEventListener("click", () => {
     if (state === "over") {
+        // 前回入力した技名を消す
+        document.getElementById("attackInput").value = "";
+
+        attackName = "";
+        attackType = "";
+        attackReason = "";
+
         state = "start";
         showScreen("startScreen");
     }
