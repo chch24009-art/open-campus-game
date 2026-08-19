@@ -328,13 +328,18 @@ function generateNames() {
 }
 
 function getTitle(s) {
-    if (s >= 150) return "伝説のAIマスター";
-    if (s >= 100) return "超絶サバイバー";
-    if (s >= 60) return "熟練モンスターハンター";
-    if (s >= 30) return "見習い勇者";
-    return "ひよっこ冒険者";
+    if (s >= 250) return "👑 神話級AIマスター";
+    if (s >= 200) return "🌌 伝説のAIマスター";
+    if (s >= 170) return "🔥 無双のサバイバー";
+    if (s >= 140) return "⚔️ 超絶モンスターハンター";
+    if (s >= 110) return "💎 歴戦の勇者";
+    if (s >= 80)  return "🏆 熟練モンスターハンター";
+    if (s >= 60)  return "🗡️ 一人前の勇者";
+    if (s >= 40)  return "✨ 駆け出しハンター";
+    if (s >= 20)  return "🌱 見習い勇者";
+    if (s >= 10)  return "🐣 ひよっこ冒険者";
+    return "💀 まだまだ修行中";
 }
-
 // =========================
 // 画面フロー
 // =========================
