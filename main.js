@@ -454,6 +454,7 @@ let enemies = [];
 let attacks = [];
 let bullets = [];
 let popups = [];
+let items = [];
 let keys = {};
 
 let weaponCooldown = 0;
@@ -483,6 +484,7 @@ function resetGame() {
     attacks = [];
     bullets = [];
     popups = [];
+    items = [];
     weaponCooldown = 0;
     score = 0;
     timeLeft = TOTAL_TIME;
@@ -582,6 +584,20 @@ function damageEnemy(index, dmg) {
     addPopup(e.x + e.size / 2, e.y, dmg);
 
     if (e.hp <= 0) {
+        // 敵を倒した位置を保存
+    　　let dropX = e.x + e.size / 2;
+  　　  let dropY = e.y + e.size / 2;
+
+　　    // 通常敵は10%、ボスは100%で回復アイテムを落とす
+  　　  if (e.boss || Math.random() < 0.10) {
+      　　  items.push({
+      　　      x: dropX,
+      　　      y: dropY,
+       　　     size: 30,
+        　　    heal: 50,
+        　　    life: 600
+     　　   });
+  　　  }
         enemies.splice(index, 1);
         score += e.point || 1;
         playKill();
@@ -901,6 +917,49 @@ function update() {
         if (hit || b.life <= 0) bullets.splice(i, 1);
     }
 
+    // =========================
+　　// 回復アイテム
+    // =========================
+
+　　for (let i = items.length - 1; i >= 0; i--) {
+　　    let item = items[i];
+
+　　    item.life--;
+
+ 　　   let dx = playerCenterX() - item.x;
+ 　　   let dy = playerCenterY() - item.y;
+  　　  let distance = Math.hypot(dx, dy);
+
+　　    // プレイヤーが触れたら回復
+　　    if (distance < player.size / 2 + item.size / 2) {
+
+   　　     let oldHp = player.hp;
+
+  　　      player.hp = Math.min(
+    　　        player.maxHp,
+    　　        player.hp + item.heal
+　　        );
+
+  　　      let healed = Math.round(player.hp - oldHp);
+
+ 　　       if (healed > 0) {
+  　　          addPopup(
+    　　            playerCenterX(),
+    　　            player.y - 10,
+     　　           "❤️ +" + healed
+    　　        );
+    　　    }
+
+    　　    items.splice(i, 1);
+    　　   continue;
+   　　 }
+
+   　　 // 一定時間経過したら消える
+  　　  if (item.life <= 0) {
+  　　      items.splice(i, 1);
+  　　  }
+　　}
+
     for (let p of popups) { p.y -= 1; p.life--; }
     popups = popups.filter(p => p.life > 0);
 
@@ -990,6 +1049,20 @@ function drawGame() {
             ctx.fillRect(e.x + e.size / 2 - bw / 2, e.y - 20, bw * (e.hp / e.maxHp), 8);
         }
     }
+
+    // 回復アイテム
+　　ctx.font = "30px sans-serif";
+　　ctx.textAlign = "center";
+　　ctx.textBaseline = "middle";
+
+　　for (let item of items) {
+　　    // 消える直前は点滅
+　　    if (item.life < 120 && Math.floor(item.life / 10) % 2 === 0) {
+    　　    continue;
+　　    }
+
+　　    ctx.fillText("❤️", item.x, item.y);
+　　}
 
     // ドローン
     ctx.font = "30px sans-serif";
