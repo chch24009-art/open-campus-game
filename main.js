@@ -596,7 +596,7 @@ function damageEnemy(index, dmg) {
   　　  let dropY = e.y + e.size / 2;
 
 　　    // 通常敵は10%、ボスは100%で回復アイテムを落とす
-  　　  if (e.boss || Math.random() < 0.10) {
+  　　  if (e.boss || Math.random() < 0.05) {
       　　  items.push({
       　　      x: dropX,
       　　      y: dropY,
