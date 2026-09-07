@@ -3,88 +3,227 @@ const ctx = canvas.getContext("2d");
 
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
+window.addEventListener("resize", () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+});
 
 // ゲームの状態: "start" / "input" / "result" / "playing" / "over"
 let state = "start";
 let dead = false;
 
-const TOTAL_TIME = 60;
+// =========================
+// 難易度設定（3パターン）
+// =========================
+
+const DIFFICULTY = {
+    easy: {
+        label: "かんたん",
+        totalTime: 75,
+        playerHp: 450,
+        playerSpeed: 9,
+        spawnCount: 3,        // 1回のスポーンで出る敵の数
+        spawnInterval: 600,   // スポーン間隔（ms）
+        enemySpeedMult: 0.75, // 敵の速度倍率
+        enemyHpMult: 0.8,     // 敵のHP倍率
+        weaponCooldown: 36,   // 攻撃クールダウン（低いほど早い）
+        bossHp: 40,
+        bossTime: 10,         // ボス出現タイミング（残り秒数）
+    },
+    normal: {
+        label: "ふつう",
+        totalTime: 60,
+        playerHp: 300,
+        playerSpeed: 8,
+        spawnCount: 5,
+        spawnInterval: 500,
+        enemySpeedMult: 1.0,
+        enemyHpMult: 1.0,
+        weaponCooldown: 42,
+        bossHp: 60,
+        bossTime: 10,
+    },
+    hard: {
+        label: "むずかしい",
+        totalTime: 45,
+        playerHp: 200,
+        playerSpeed: 8,
+        spawnCount: 7,
+        spawnInterval: 400,
+        enemySpeedMult: 1.3,
+        enemyHpMult: 1.3,
+        weaponCooldown: 48,
+        bossHp: 90,
+        bossTime: 12,
+    }
+};
+
+let currentDifficulty = "normal";
+let diff = DIFFICULTY.normal;
+
+// =========================
+// 背景パーティクル（星空）
+// =========================
+
+const bgStars = [];
+const bgParticles = [];
+
+// 星を初期化
+for (let i = 0; i < 120; i++) {
+    bgStars.push({
+        x: Math.random() * 2000,
+        y: Math.random() * 2000,
+        size: Math.random() * 2.5 + 0.5,
+        speed: Math.random() * 0.3 + 0.05,
+        twinkle: Math.random() * Math.PI * 2,
+        twinkleSpeed: Math.random() * 0.03 + 0.01
+    });
+}
+
+// 属性ごとの背景パーティクル色
+const BG_PARTICLE_COLORS = {
+    "炎": ["#ff4500", "#ff6b35", "#ffa500", "#ff8c00"],
+    "雷": ["#ffd700", "#ffff00", "#ffe44d", "#f0e68c"],
+    "氷": ["#00e5ff", "#00bcd4", "#80deea", "#b2ebf2"],
+    "風": ["#76ff03", "#69f0ae", "#b9f6ca", "#00e676"],
+    "ビーム": ["#e040fb", "#ea80fc", "#ce93d8", "#f48fb1"]
+};
+
+function spawnBgParticle() {
+    if (state !== "playing" || bgParticles.length > 40) return;
+    let colors = BG_PARTICLE_COLORS[attackType] || ["#ffffff"];
+    bgParticles.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        size: Math.random() * 3 + 1,
+        vx: (Math.random() - 0.5) * 0.5,
+        vy: (Math.random() - 0.5) * 0.5,
+        life: 200 + Math.random() * 200,
+        maxLife: 200 + Math.random() * 200,
+        color: colors[Math.floor(Math.random() * colors.length)]
+    });
+}
+
+function drawBackground() {
+    // 属性に応じたグラデーション背景
+    let baseColor1 = "#0a0a1a";
+    let baseColor2 = "#0d1025";
+
+    if (state === "playing" || state === "over") {
+        const gradColors = {
+            "炎": ["#1a0800", "#0d0500"],
+            "雷": ["#1a1500", "#0d0a00"],
+            "氷": ["#001a1a", "#000d10"],
+            "風": ["#0a1a00", "#050d00"],
+            "ビーム": ["#14001a", "#0a000d"]
+        };
+        let gc = gradColors[attackType] || [baseColor1, baseColor2];
+        baseColor1 = gc[0];
+        baseColor2 = gc[1];
+    }
+
+    let grd = ctx.createRadialGradient(
+        canvas.width / 2, canvas.height / 2, 0,
+        canvas.width / 2, canvas.height / 2, Math.max(canvas.width, canvas.height) * 0.7
+    );
+    grd.addColorStop(0, baseColor1);
+    grd.addColorStop(1, baseColor2);
+    ctx.fillStyle = grd;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // 瞬く星
+    for (let s of bgStars) {
+        s.twinkle += s.twinkleSpeed;
+        let alpha = 0.3 + Math.sin(s.twinkle) * 0.3;
+        ctx.fillStyle = "rgba(200, 210, 255, " + alpha + ")";
+        ctx.beginPath();
+        ctx.arc(s.x % canvas.width, s.y % canvas.height, s.size, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // 属性パーティクル（プレイ中のみ）
+    for (let i = bgParticles.length - 1; i >= 0; i--) {
+        let p = bgParticles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.life--;
+        if (p.life <= 0) { bgParticles.splice(i, 1); continue; }
+        let alpha = Math.min(1, p.life / p.maxLife) * 0.4;
+        ctx.fillStyle = p.color;
+        ctx.globalAlpha = alpha;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+        ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+}
 
 // =========================
 // 画面（DOM）を作る
 // =========================
 
 const ui = document.createElement("div");
-ui.innerHTML = `
-<style>
-.screen {
-    position: fixed;
-    inset: 0;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 24px;
-    color: white;
-    font-family: sans-serif;
-    background: rgba(0, 0, 0, 0.88);
-    text-align: center;
-    z-index: 10;
-}
-.screen h1 { font-size: 52px; margin: 0; }
-.screen h2 { font-size: 36px; margin: 0; }
-.screen p { font-size: 22px; margin: 0; color: #ccc; }
-.screen .gen { font-size: 26px; color: white; }
-.screen button {
-    font-size: 26px;
-    padding: 14px 60px;
-    border: none;
-    border-radius: 10px;
-    background: orange;
-    color: black;
-    font-weight: bold;
-    cursor: pointer;
-}
-.screen button:hover { background: gold; }
-.screen input {
-    font-size: 24px;
-    padding: 12px 20px;
-    border-radius: 10px;
-    border: 3px solid orange;
-    width: min(400px, 80vw);
-    text-align: center;
-}
-</style>
-
-<div id="startScreen" class="screen">
-    <h1>生成AIサバイバルゲーム</h1>
-    <p>攻撃名を入力して、AIが決めた攻撃で敵を倒そう！</p>
-    <button id="startBtn">START</button>
-</div>
-
-<div id="inputScreen" class="screen" style="display:none">
-    <h2>攻撃名を入力してください</h2>
-    <input id="attackInput" placeholder="例：ファイヤーブレイク" maxlength="20">
-    <button id="decideBtn">決定</button>
-</div>
-
-<div id="resultScreen" class="screen" style="display:none">
-    <h2>AI生成結果</h2>
-    <p id="genHeroEmoji" style="font-size:70px; margin:0"></p>
-    <p class="gen" id="genHero"></p>
-    <p class="gen" id="genAttack"></p>
-    <p id="genReason" style="font-size:19px; color:#ffd479; max-width:600px; margin:0 20px"></p>
-    <p class="gen" id="genEnemy1"></p>
-    <p class="gen" id="genEnemy2"></p>
-    <p class="gen" id="genEnemy3"></p>
-    <button id="playBtn">ゲーム開始</button>
-</div>
-`;
+ui.innerHTML = '\
+<div id="startScreen" class="screen">\
+    <h1>生成AIサバイバルゲーム</h1>\
+    <p>攻撃名を入力して、AIが決めた攻撃で敵を倒そう！</p>\
+    <p class="subtitle">WASDキーまたは矢印キーで移動 ─ 攻撃は自動</p>\
+    <p style="font-size:18px; color:#ccd; margin-top:12px;">難易度を選んでください</p>\
+    <div class="difficulty-select">\
+        <button class="diff-btn diff-easy" data-diff="easy">\
+            <span class="diff-icon">🌱</span>\
+            <span class="diff-label">かんたん</span>\
+            <span class="diff-desc">HP多め・敵少なめ<br>75秒サバイバル</span>\
+        </button>\
+        <button class="diff-btn diff-normal selected" data-diff="normal">\
+            <span class="diff-icon">⚔️</span>\
+            <span class="diff-label">ふつう</span>\
+            <span class="diff-desc">バランス型<br>60秒サバイバル</span>\
+        </button>\
+        <button class="diff-btn diff-hard" data-diff="hard">\
+            <span class="diff-icon">💀</span>\
+            <span class="diff-label">むずかしい</span>\
+            <span class="diff-desc">HP少なめ・敵多め<br>45秒サバイバル</span>\
+        </button>\
+    </div>\
+    <button id="startBtn" style="margin-top:10px;">START</button>\
+</div>\
+\
+<div id="inputScreen" class="screen" style="display:none">\
+    <h2>攻撃名を入力してください</h2>\
+    <input id="attackInput" placeholder="例：ファイヤーブレイク" maxlength="20">\
+    <button id="decideBtn">決定</button>\
+</div>\
+\
+<div id="resultScreen" class="screen" style="display:none">\
+    <h2>AI生成結果</h2>\
+    <p id="genHeroEmoji" style="font-size:70px; margin:0"></p>\
+    <p class="gen" id="genHero"></p>\
+    <p class="gen" id="genAttack"></p>\
+    <p id="genReason" style="font-size:17px; color:#ffd479; max-width:600px; margin:0 20px"></p>\
+    <p class="gen" id="genEnemy1"></p>\
+    <p class="gen" id="genEnemy2"></p>\
+    <p class="gen" id="genEnemy3"></p>\
+    <p id="genDiff" style="font-size:16px; color:#aab; margin-top:4px;"></p>\
+    <button id="playBtn">ゲーム開始</button>\
+</div>\
+';
 document.body.appendChild(ui);
 
+// 難易度ボタン処理
+document.querySelectorAll(".diff-btn").forEach(function(btn) {
+    btn.addEventListener("click", function() {
+        document.querySelectorAll(".diff-btn").forEach(function(b) { b.classList.remove("selected"); });
+        btn.classList.add("selected");
+        currentDifficulty = btn.dataset.diff;
+        diff = DIFFICULTY[currentDifficulty];
+    });
+});
+
 function showScreen(id) {
-    for (let s of document.querySelectorAll(".screen")) {
-        s.style.display = "none";
+    var screens = document.querySelectorAll(".screen");
+    for (var i = 0; i < screens.length; i++) {
+        screens[i].style.display = "none";
     }
     if (id) document.getElementById(id).style.display = "flex";
 }
@@ -150,23 +289,23 @@ function noise(dur, vol, filterFreq) {
 
 // 効果音
 const SFX = {
-    "炎": () => noise(0.25, 0.25, 800),
-    "雷": () => { noise(0.12, 0.3, 4000); tone(120, 0.2, "sawtooth", 0.2); },
-    "氷": () => tone(1200, 0.15, "sine", 0.15, 400),
-    "風": () => noise(0.4, 0.15, 500),
-    "ビーム": () => tone(900, 0.25, "sawtooth", 0.18, 150),
-    kill: () => tone(600, 0.08, "square", 0.12, 1200),
-    bossWarn: () => {
+    "炎": function() { noise(0.25, 0.25, 800); },
+    "雷": function() { noise(0.12, 0.3, 4000); tone(120, 0.2, "sawtooth", 0.2); },
+    "氷": function() { tone(1200, 0.15, "sine", 0.15, 400); },
+    "風": function() { noise(0.4, 0.15, 500); },
+    "ビーム": function() { tone(900, 0.25, "sawtooth", 0.18, 150); },
+    kill: function() { tone(600, 0.08, "square", 0.12, 1200); },
+    bossWarn: function() {
         tone(440, 0.3, "square", 0.25);
         tone(330, 0.3, "square", 0.25, null, 0.35);
         tone(440, 0.3, "square", 0.25, null, 0.7);
     },
-    gameover: () => {
+    gameover: function() {
         tone(400, 0.3, "triangle", 0.3, 200);
         tone(300, 0.5, "triangle", 0.3, 120, 0.3);
     },
-    survived: () => {
-        [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.18, "triangle", 0.25, null, i * 0.15));
+    survived: function() {
+        [523, 659, 784, 1047].forEach(function(f, i) { tone(f, 0.18, "triangle", 0.25, null, i * 0.15); });
     }
 };
 
@@ -182,7 +321,7 @@ function playKill() {
 const BGM_NOTES = [110, 110, 165, 110, 131, 131, 196, 165];
 function startBGM() {
     if (bgmTimer) return;
-    bgmTimer = setInterval(() => {
+    bgmTimer = setInterval(function() {
         if (state !== "playing" || !audioCtx) return;
         let f = BGM_NOTES[bgmStep % BGM_NOTES.length];
         tone(f, 0.15, "triangle", 0.1);
@@ -202,7 +341,7 @@ let attackReason = "";
 let heroName = "";
 let enemyNames = { normal: "", fast: "", tank: "", boss: "" };
 
-// 各属性のキーワード（はっきり一致した場合はこちらを優先）
+// 各属性のキーワード
 const ELEMENT_KEYWORDS = {
     "炎": ["炎", "火", "ファイヤ", "フレイム", "バーン", "灼", "爆", "熱", "マグマ", "太陽"],
     "雷": ["雷", "サンダ", "電", "ライトニング", "スパーク", "プラズマ", "閃", "轟"],
@@ -211,7 +350,7 @@ const ELEMENT_KEYWORDS = {
     "ビーム": ["ビーム", "レーザー", "光", "星", "銀河", "宇宙", "波動", "オーラ", "神", "極"]
 };
 
-// 母音・語感から属性を推測するためのヒント
+// 母音・語感から属性を推測
 const VOWEL_ELEMENT = {
     "a": "炎",   // 開いた強い響き → 炎
     "i": "雷",   // 鋭い響き → 雷
@@ -220,12 +359,10 @@ const VOWEL_ELEMENT = {
     "o": "ビーム" // 重く伸びる響き → ビーム
 };
 
-// キーワード一致したときの理由文
 function keywordReason(name, kw, type) {
     return "入力の中に「" + kw + "」が含まれていたため、" + type + "系と判定しました。";
 }
 
-// キーワードが無いときの、それっぽい理由文（属性ごと）
 const GUESS_REASONS = {
     "炎": ["語感が力強く熱を感じさせるため", "破壊力の高そうな響きを持つため", "勢いのある攻撃的な名前のため"],
     "雷": ["音が鋭くスピード感があるため", "一瞬で決まりそうな切れ味を感じるため", "電撃のような響きを持つため"],
@@ -234,7 +371,6 @@ const GUESS_REASONS = {
     "ビーム": ["どの属性にも寄らない神秘的な響きのため", "エネルギーを凝縮したような語感のため", "未知の力を感じさせる名前のため"]
 };
 
-// 文字列から安定した数値を作る（同じ入力なら毎回同じ結果に）
 function hashString(s) {
     let h = 0;
     for (let i = 0; i < s.length; i++) {
@@ -246,7 +382,7 @@ function hashString(s) {
 function classifyAttack(name) {
     let lower = name.toLowerCase();
 
-    // 1. まずキーワードで判定（はっきり分かるものは正確に）
+    // 1. まずキーワードで判定
     for (let type in ELEMENT_KEYWORDS) {
         for (let kw of ELEMENT_KEYWORDS[type]) {
             if (name.includes(kw) || lower.includes(kw.toLowerCase())) {
@@ -257,12 +393,11 @@ function classifyAttack(name) {
         }
     }
 
-    // 2. キーワードが無い場合：母音の出現をスコア化して一番多い属性を選ぶ
+    // 2. キーワードが無い場合：母音の出現をスコア化
     let scores = { "炎": 0, "雷": 0, "氷": 0, "風": 0, "ビーム": 0 };
     for (let ch of lower) {
         if (VOWEL_ELEMENT[ch]) scores[VOWEL_ELEMENT[ch]]++;
     }
-    // 全角カタカナ等で母音が拾えないときのために、ハッシュで微妙な差をつける
     let h = hashString(name);
     let types = Object.keys(scores);
     scores[types[h % 5]] += 0.5;
@@ -306,6 +441,7 @@ const ELEMENT_COLORS = {
     "ビーム": "magenta"
 };
 let heroEmoji = "🚀";
+
 const ENEMY_ADJ = ["漆黒の", "混沌の", "深淵の", "暴走", "呪われし", "鋼鉄の", "冥界の", "狂乱の"];
 const ENEMY_NOUN = {
     normal: ["インベーダー", "スライム", "ウォッチャー", "クリーパー"],
@@ -329,24 +465,26 @@ function generateNames() {
 
 function getTitle(s) {
     if (s >= 750) return "👑 AI界の神";
-    if (s >= 725)  return "🌌 伝説を超えし者";
-    if (s >= 700)  return "🔥 無双のサバイバー";
-    if (s >= 675)  return "⚡ 超越者";
-    if (s >= 650)  return "💎 伝説のAIマスター";
-    if (s >= 625)  return "🏆 最強モンスターハンター";
-    if (s >= 600)  return "⚔️ 歴戦の勇者";
-    if (s >= 575)  return "🗡️ 熟練ハンター";
-    if (s >= 550)  return "✨ 一人前の勇者";
-    if (s >= 525)  return "🌱 見習い勇者";
-    if (s >= 500)   return "🐣 ひよっこ冒険者";
+    if (s >= 725) return "🌌 伝説を超えし者";
+    if (s >= 700) return "🔥 無双のサバイバー";
+    if (s >= 675) return "⚡ 超越者";
+    if (s >= 650) return "💎 伝説のAIマスター";
+    if (s >= 625) return "🏆 最強モンスターハンター";
+    if (s >= 600) return "⚔️ 歴戦の勇者";
+    if (s >= 575) return "🗡️ 熟練ハンター";
+    if (s >= 550) return "✨ 一人前の勇者";
+    if (s >= 525) return "🌱 見習い勇者";
+    if (s >= 500) return "🐣 ひよっこ冒険者";
     return "💀 まだまだ修行中";
 }
+
 // =========================
 // 画面フロー
 // =========================
 
-document.getElementById("startBtn").addEventListener("click", () => {
-    initAudio();   // 音はユーザー操作の後でないと鳴らせないルールのためここで準備
+document.getElementById("startBtn").addEventListener("click", function() {
+    initAudio();
+    diff = DIFFICULTY[currentDifficulty];
     state = "input";
     showScreen("inputScreen");
     document.getElementById("attackInput").focus();
@@ -368,11 +506,9 @@ async function decide() {
     try {
         const response = await fetch("https://open-campus-server.onrender.com/classify", {
             method: "POST",
-
             headers: {
                 "Content-Type": "application/json"
             },
-
             body: JSON.stringify({
                 attackName: attackName
             })
@@ -385,69 +521,47 @@ async function decide() {
         const data = await response.json();
 
         console.log(data);
-        
+
         attackType = data.attackType;
         attackReason = data.reason;
 
-        generateNames();
-
-        document.getElementById("genHeroEmoji").textContent =
-            heroEmoji;
-
-        document.getElementById("genHero").textContent =
-            "主人公名：" + heroName;
-
-        document.getElementById("genAttack").textContent =
-            "攻撃タイプ：" +
-            attackType +
-            "系（" +
-            attackName +
-            "）";
-
-        document.getElementById("genReason").textContent =
-            "🤖 AIの判定理由：" + attackReason;
-
-        document.getElementById("genEnemy1").textContent =
-            "敵キャラ名1：👾 " + enemyNames.normal;
-
-        document.getElementById("genEnemy2").textContent =
-            "敵キャラ名2：👻 " + enemyNames.fast;
-
-        document.getElementById("genEnemy3").textContent =
-            "敵キャラ名3：👹 " + enemyNames.tank;
-
-        state = "result";
-        showScreen("resultScreen");
-
     } catch (error) {
-
-        console.error(error);
-
-        alert(
-            "AIとの通信に失敗しました。\n" +
-            "server.jsが起動しているか確認してください。"
-        );
-
-    } finally {
-
-        btn.textContent = "決定";
-        btn.disabled = false;
-
+        // サーバー接続失敗時はローカル分類にフォールバック
+        console.warn("サーバー接続失敗、ローカル分類を使用:", error);
+        classifyAttack(attackName);
     }
+
+    generateNames();
+
+    document.getElementById("genHeroEmoji").textContent = heroEmoji;
+    document.getElementById("genHero").textContent = "主人公名：" + heroName;
+    document.getElementById("genAttack").textContent = "攻撃タイプ：" + attackType + "系（" + attackName + "）";
+    document.getElementById("genReason").textContent = "🤖 AIの判定理由：" + attackReason;
+    document.getElementById("genEnemy1").textContent = "敵キャラ名1：👾 " + enemyNames.normal;
+    document.getElementById("genEnemy2").textContent = "敵キャラ名2：👻 " + enemyNames.fast;
+    document.getElementById("genEnemy3").textContent = "敵キャラ名3：👹 " + enemyNames.tank;
+    document.getElementById("genDiff").textContent = "難易度：" + diff.label + "（" + diff.totalTime + "秒）";
+
+    state = "result";
+    showScreen("resultScreen");
+
+    btn.textContent = "決定";
+    btn.disabled = false;
 }
 
 document.getElementById("decideBtn").addEventListener("click", decide);
-document.getElementById("attackInput").addEventListener("keydown", (e) => {
+document.getElementById("attackInput").addEventListener("keydown", function(e) {
     if (e.key === "Enter") decide();
 });
 
-document.getElementById("playBtn").addEventListener("click", () => {
+document.getElementById("playBtn").addEventListener("click", function() {
     showScreen(null);
     if (document.activeElement) document.activeElement.blur();
     initAudio();
     startBGM();
     resetGame();
     state = "playing";
+    startSpawnTimer();
 });
 
 // =========================
@@ -465,7 +579,7 @@ let keys = {};
 
 let weaponCooldown = 0;
 let score = 0;
-let timeLeft = TOTAL_TIME;
+let timeLeft = 60;
 let bossSpawned = false;
 let bossWarn = 0;
 
@@ -478,9 +592,9 @@ function resetGame() {
         x: canvas.width / 2,
         y: canvas.height / 2,
         size: 40,
-        speed: 8,
-        hp: 300,
-        maxHp: 300
+        speed: diff.playerSpeed,
+        hp: diff.playerHp,
+        maxHp: diff.playerHp
     };
     drones = [
         { angle: 0, size: 30, cooldown: 0, x: 0, y: 0 },
@@ -491,9 +605,10 @@ function resetGame() {
     bullets = [];
     popups = [];
     items = [];
+    bgParticles.length = 0;
     weaponCooldown = 0;
     score = 0;
-    timeLeft = TOTAL_TIME;
+    timeLeft = diff.totalTime;
     bossSpawned = false;
     bossWarn = 0;
     dead = false;
@@ -504,26 +619,23 @@ function resetGame() {
 // =========================
 
 // e.code（物理キー）で判定するので、日本語入力がONのままでも動く
-document.addEventListener("keydown", (e) => {
+document.addEventListener("keydown", function(e) {
     if (e.target.tagName === "INPUT") return;
     keys[e.code] = true;
-    if (state === "playing") e.preventDefault();   // 変換候補が出るのを防ぐ
+    if (state === "playing") e.preventDefault();
 });
 
-document.addEventListener("keyup", (e) => {
+document.addEventListener("keyup", function(e) {
     if (e.target.tagName === "INPUT") return;
     keys[e.code] = false;
 });
 
-canvas.addEventListener("click", () => {
+canvas.addEventListener("click", function() {
     if (state === "over") {
-        // 前回入力した技名を消す
         document.getElementById("attackInput").value = "";
-
         attackName = "";
         attackType = "";
         attackReason = "";
-
         state = "start";
         showScreen("startScreen");
     }
@@ -540,28 +652,24 @@ function spawnEnemy() {
     let x, y;
 
     if (side === 0) {
-        x = Math.random() * canvas.width;
-        y = -30;
+        x = Math.random() * canvas.width; y = -30;
     } else if (side === 1) {
-        x = Math.random() * canvas.width;
-        y = canvas.height + 30;
+        x = Math.random() * canvas.width; y = canvas.height + 30;
     } else if (side === 2) {
-        x = -30;
-        y = Math.random() * canvas.height;
+        x = -30; y = Math.random() * canvas.height;
     } else {
-        x = canvas.width + 30;
-        y = Math.random() * canvas.height;
+        x = canvas.width + 30; y = Math.random() * canvas.height;
     }
 
-    let elapsed = TOTAL_TIME - timeLeft;
+    let elapsed = diff.totalTime - timeLeft;
     let r = Math.random();
     let type;
     if (r < 0.25) {
-        type = { emoji: "👻", size: 24, speed: 4.5, hp: 1, dmg: 0.1, point: 1 };
+        type = { emoji: "👻", size: 24, speed: 4.5 * diff.enemySpeedMult, hp: 1 * diff.enemyHpMult, dmg: 0.1, point: 1 };
     } else if (r < 0.4 && elapsed >= 5) {
-        type = { emoji: "👹", size: 44, speed: 1.3, hp: 10, dmg: 0.4, point: 3 };
+        type = { emoji: "👹", size: 44, speed: 1.3 * diff.enemySpeedMult, hp: 10 * diff.enemyHpMult, dmg: 0.4, point: 3 };
     } else {
-        type = { emoji: "👾", size: 30, speed: 2.5, hp: 3, dmg: 0.15, point: 1 };
+        type = { emoji: "👾", size: 30, speed: 2.5 * diff.enemySpeedMult, hp: 3 * diff.enemyHpMult, dmg: 0.15, point: 1 };
     }
 
     enemies.push({
@@ -579,8 +687,8 @@ function spawnBoss() {
     SFX.bossWarn();
     enemies.push({
         x: canvas.width / 2 - 40, y: -100,
-        size: 80, speed: 1.8,
-        hp: 60, maxHp: 60,
+        size: 80, speed: 1.8 * diff.enemySpeedMult,
+        hp: diff.bossHp, maxHp: diff.bossHp,
         dmg: 1.0, point: 20,
         emoji: "🐲", boss: true,
         hitCooldown: 0, slowTime: 0
@@ -597,20 +705,19 @@ function damageEnemy(index, dmg) {
     addPopup(e.x + e.size / 2, e.y, dmg);
 
     if (e.hp <= 0) {
-        // 敵を倒した位置を保存
-    　　let dropX = e.x + e.size / 2;
-  　　  let dropY = e.y + e.size / 2;
+        let dropX = e.x + e.size / 2;
+        let dropY = e.y + e.size / 2;
 
-　　    // 通常敵は10%、ボスは100%で回復アイテムを落とす
-  　　  if (e.boss || Math.random() < 0.05) {
-      　　  items.push({
-      　　      x: dropX,
-      　　      y: dropY,
-       　　     size: 30,
-        　　    heal: 50,
-        　　    life: 600
-     　　   });
-  　　  }
+        // 通常敵は5%、ボスは100%で回復アイテムを落とす
+        if (e.boss || Math.random() < 0.05) {
+            items.push({
+                x: dropX,
+                y: dropY,
+                size: 30,
+                heal: 50,
+                life: 600
+            });
+        }
         enemies.splice(index, 1);
         score += e.point || 1;
         playKill();
@@ -635,7 +742,7 @@ function nearestEnemy(x, y) {
     return best;
 }
 
-// ターゲティングAI：群れの中心（周囲120px以内に仲間が一番多い敵）を探す
+// ターゲティングAI：群れの中心を探す
 function densestEnemy() {
     let best = null;
     let bestCount = -1;
@@ -691,7 +798,6 @@ function createFireAttack(x, y) {
         baseAngle = Math.random() * Math.PI * 2;
     }
 
-    // 群れの方向を中心に120度の扇で8発
     for (let i = 0; i < 8; i++) {
         let angle = baseAngle + (i - 3.5) / 7 * (Math.PI * 2 / 3);
         attacks.push({
@@ -713,7 +819,7 @@ function createLightningAttack(x, y) {
     let cy = center.y;
 
     let targets = [...enemies]
-        .sort((a, b) => {
+        .sort(function(a, b) {
             let da = Math.hypot(a.x - cx, a.y - cy);
             let db = Math.hypot(b.x - cx, b.y - cy);
             return da - db;
@@ -800,7 +906,6 @@ function updateDrones() {
 
         d.cooldown--;
         if (d.cooldown <= 0) {
-            // 1機目は一番近い敵（守り）、2機目は群れの中心（攻め）を狙う
             let target = (d === drones[0])
                 ? nearestEnemy(d.x, d.y)
                 : (densestEnemy() || nearestEnemy(d.x, d.y));
@@ -825,6 +930,9 @@ function updateDrones() {
 
 function update() {
     if (state !== "playing") return;
+
+    // 背景パーティクル生成
+    if (Math.random() < 0.15) spawnBgParticle();
 
     if (keys["KeyW"] || keys["ArrowUp"]) player.y -= player.speed;
     if (keys["KeyS"] || keys["ArrowDown"]) player.y += player.speed;
@@ -867,7 +975,7 @@ function update() {
     weaponCooldown--;
     if (weaponCooldown <= 0) {
         createAttack();
-        weaponCooldown = 42;
+        weaponCooldown = diff.weaponCooldown;
     }
 
     updateDrones();
@@ -909,7 +1017,7 @@ function update() {
             }
         }
     }
-    attacks = attacks.filter(a => a.life > 0);
+    attacks = attacks.filter(function(a) { return a.life > 0; });
 
     for (let i = bullets.length - 1; i >= 0; i--) {
         let b = bullets[i];
@@ -930,51 +1038,32 @@ function update() {
         if (hit || b.life <= 0) bullets.splice(i, 1);
     }
 
-    // =========================
-　　// 回復アイテム
-    // =========================
+    // 回復アイテム
+    for (let i = items.length - 1; i >= 0; i--) {
+        let item = items[i];
+        item.life--;
+        let dx = playerCenterX() - item.x;
+        let dy = playerCenterY() - item.y;
+        let distance = Math.hypot(dx, dy);
 
-　　for (let i = items.length - 1; i >= 0; i--) {
-　　    let item = items[i];
+        if (distance < player.size / 2 + item.size / 2) {
+            let oldHp = player.hp;
+            player.hp = Math.min(player.maxHp, player.hp + item.heal);
+            let healed = Math.round(player.hp - oldHp);
+            if (healed > 0) {
+                addPopup(playerCenterX(), player.y - 10, "❤️ +" + healed);
+            }
+            items.splice(i, 1);
+            continue;
+        }
 
-　　    item.life--;
-
- 　　   let dx = playerCenterX() - item.x;
- 　　   let dy = playerCenterY() - item.y;
-  　　  let distance = Math.hypot(dx, dy);
-
-　　    // プレイヤーが触れたら回復
-　　    if (distance < player.size / 2 + item.size / 2) {
-
-   　　     let oldHp = player.hp;
-
-  　　      player.hp = Math.min(
-    　　        player.maxHp,
-    　　        player.hp + item.heal
-　　        );
-
-  　　      let healed = Math.round(player.hp - oldHp);
-
- 　　       if (healed > 0) {
-  　　          addPopup(
-    　　            playerCenterX(),
-    　　            player.y - 10,
-     　　           "❤️ +" + healed
-    　　        );
-    　　    }
-
-    　　    items.splice(i, 1);
-    　　   continue;
-   　　 }
-
-   　　 // 一定時間経過したら消える
-  　　  if (item.life <= 0) {
-  　　      items.splice(i, 1);
-  　　  }
-　　}
+        if (item.life <= 0) {
+            items.splice(i, 1);
+        }
+    }
 
     for (let p of popups) { p.y -= 1; p.life--; }
-    popups = popups.filter(p => p.life > 0);
+    popups = popups.filter(function(p) { return p.life > 0; });
 
     if (bossWarn > 0) bossWarn--;
 }
@@ -1038,14 +1127,21 @@ function drawGame() {
     ctx.font = player.size + "px sans-serif";
     ctx.fillText(heroEmoji, playerCenterX(), playerCenterY());
 
-    // HPバー
+    // HPバー（残量に応じて色が変わる）
     let barW = 60;
     let bx = playerCenterX() - barW / 2;
     let by = player.y + player.size + 10;
-    ctx.fillStyle = "black";
+    ctx.fillStyle = "rgba(0,0,0,0.6)";
     ctx.fillRect(bx - 2, by - 2, barW + 4, 12);
-    ctx.fillStyle = "orange";
-    ctx.fillRect(bx, by, barW * (player.hp / player.maxHp), 8);
+    let hpRatio = player.hp / player.maxHp;
+    if (hpRatio > 0.5) {
+        ctx.fillStyle = "#4caf50";
+    } else if (hpRatio > 0.25) {
+        ctx.fillStyle = "orange";
+    } else {
+        ctx.fillStyle = "#f44336";
+    }
+    ctx.fillRect(bx, by, barW * hpRatio, 8);
 
     // 敵
     for (let e of enemies) {
@@ -1056,7 +1152,7 @@ function drawGame() {
 
         if (e.boss) {
             let bw = 100;
-            ctx.fillStyle = "black";
+            ctx.fillStyle = "rgba(0,0,0,0.6)";
             ctx.fillRect(e.x + e.size / 2 - bw / 2 - 2, e.y - 22, bw + 4, 12);
             ctx.fillStyle = "red";
             ctx.fillRect(e.x + e.size / 2 - bw / 2, e.y - 20, bw * (e.hp / e.maxHp), 8);
@@ -1064,18 +1160,15 @@ function drawGame() {
     }
 
     // 回復アイテム
-　　ctx.font = "30px sans-serif";
-　　ctx.textAlign = "center";
-　　ctx.textBaseline = "middle";
-
-　　for (let item of items) {
-　　    // 消える直前は点滅
-　　    if (item.life < 120 && Math.floor(item.life / 10) % 2 === 0) {
-    　　    continue;
-　　    }
-
-　　    ctx.fillText("❤️", item.x, item.y);
-　　}
+    ctx.font = "30px sans-serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    for (let item of items) {
+        if (item.life < 120 && Math.floor(item.life / 10) % 2 === 0) {
+            continue;
+        }
+        ctx.fillText("❤️", item.x, item.y);
+    }
 
     // ドローン
     ctx.font = "30px sans-serif";
@@ -1103,13 +1196,20 @@ function drawGame() {
     ctx.textAlign = "left";
     ctx.textBaseline = "alphabetic";
 
+    // HUD背景
+    ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+    ctx.fillRect(10, 10, 380, 150);
+
     // 情報表示
     ctx.fillStyle = "white";
-    ctx.font = "26px sans-serif";
+    ctx.font = "24px sans-serif";
     ctx.fillText("TIME: " + timeLeft, 20, 40);
-    ctx.fillText("SCORE: " + score, 20, 75);
-    ctx.fillText("主人公: " + heroName, 20, 110);
-    ctx.fillText("技名: " + attackName + "（" + attackType + "系）", 20, 145);
+    ctx.fillText("SCORE: " + score, 20, 68);
+    ctx.fillText("主人公: " + heroName, 20, 96);
+    ctx.fillText("技名: " + attackName + "（" + attackType + "系）", 20, 124);
+    ctx.font = "16px sans-serif";
+    ctx.fillStyle = "#aab";
+    ctx.fillText("難易度: " + diff.label, 20, 148);
 
     // ボス出現の警告
     if (bossWarn > 0) {
@@ -1133,18 +1233,23 @@ function drawOver() {
     ctx.textAlign = "center";
 
     ctx.font = "50px sans-serif";
-    ctx.fillText(dead ? "GAME OVER" : "SURVIVED!", canvas.width / 2, canvas.height / 2 - 100);
+    ctx.fillText(dead ? "GAME OVER" : "SURVIVED!", canvas.width / 2, canvas.height / 2 - 120);
 
     ctx.font = "36px sans-serif";
-    ctx.fillText("SCORE: " + score, canvas.width / 2, canvas.height / 2 - 40);
+    ctx.fillText("SCORE: " + score, canvas.width / 2, canvas.height / 2 - 60);
 
     ctx.font = "32px sans-serif";
     ctx.fillStyle = "gold";
-    ctx.fillText("称号：" + getTitle(score), canvas.width / 2, canvas.height / 2 + 10);
+    ctx.fillText("称号：" + getTitle(score), canvas.width / 2, canvas.height / 2 - 10);
 
     ctx.fillStyle = "white";
-    ctx.font = "26px sans-serif";
-    ctx.fillText("主人公：" + heroName + "　使用した技：" + attackName, canvas.width / 2, canvas.height / 2 + 60);
+    ctx.font = "24px sans-serif";
+    ctx.fillText("主人公：" + heroName + "　技：" + attackName, canvas.width / 2, canvas.height / 2 + 40);
+    ctx.fillStyle = "#aab";
+    ctx.font = "20px sans-serif";
+    ctx.fillText("難易度：" + diff.label, canvas.width / 2, canvas.height / 2 + 70);
+    ctx.fillStyle = "white";
+    ctx.font = "22px sans-serif";
     ctx.fillText("クリックでタイトルへ", canvas.width / 2, canvas.height / 2 + 110);
 
     ctx.textAlign = "left";
@@ -1152,6 +1257,7 @@ function drawOver() {
 
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawBackground();
 
     if (state === "playing") {
         drawGame();
@@ -1172,20 +1278,30 @@ function gameLoop() {
 
 gameLoop();
 
-setInterval(() => {
-    if (state === "playing") {
-        for (let i = 0; i < 5; i++) {
-            spawnEnemy();
-        }
-    }
-}, 500);
+// 敵スポーンタイマー（難易度で間隔・数が変わる）
+let spawnTimer = null;
 
-setInterval(() => {
+function startSpawnTimer() {
+    if (spawnTimer) clearInterval(spawnTimer);
+    spawnTimer = setInterval(function() {
+        if (state === "playing") {
+            for (let i = 0; i < diff.spawnCount; i++) {
+                spawnEnemy();
+            }
+        }
+    }, diff.spawnInterval);
+}
+
+// 初回のスポーンタイマーを開始
+startSpawnTimer();
+
+// 1秒ごとのタイマー
+setInterval(function() {
     if (state === "playing") {
         timeLeft--;
 
-        // 残り10秒でボス出現
-        if (timeLeft === 10 && !bossSpawned) {
+        // 残りbossTime秒でボス出現
+        if (timeLeft === diff.bossTime && !bossSpawned) {
             bossSpawned = true;
             spawnBoss();
         }
