@@ -1,22 +1,23 @@
+
 * {
     margin: 0;
     padding: 0;
     box-sizing: border-box;
 }
-
+ 
 body {
     overflow: hidden;
     background: #0a0a1a;
 }
-
+ 
 canvas {
     display: block;
 }
-
+ 
 /* ===========================
    画面オーバーレイ共通
    =========================== */
-
+ 
 .screen {
     position: fixed;
     inset: 0;
@@ -31,7 +32,7 @@ canvas {
     text-align: center;
     z-index: 10;
 }
-
+ 
 .screen h1 {
     font-size: 48px;
     margin: 0;
@@ -41,23 +42,23 @@ canvas {
     background-clip: text;
     letter-spacing: 2px;
 }
-
+ 
 .screen h2 {
     font-size: 32px;
     margin: 0;
 }
-
+ 
 .screen p {
     font-size: 20px;
     margin: 0;
     color: #aab;
 }
-
+ 
 .screen .gen {
     font-size: 22px;
     color: white;
 }
-
+ 
 .screen button {
     font-size: 22px;
     padding: 12px 50px;
@@ -70,19 +71,19 @@ canvas {
     transition: transform 0.15s, box-shadow 0.15s;
     letter-spacing: 1px;
 }
-
+ 
 .screen button:hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(255, 107, 53, 0.4);
 }
-
+ 
 .screen button:disabled {
     opacity: 0.5;
     cursor: default;
     transform: none;
     box-shadow: none;
 }
-
+ 
 .screen input {
     font-size: 22px;
     padding: 12px 20px;
@@ -95,26 +96,26 @@ canvas {
     outline: none;
     transition: border-color 0.2s;
 }
-
+ 
 .screen input:focus {
     border-color: #ff6b35;
     box-shadow: 0 0 12px rgba(255, 107, 53, 0.3);
 }
-
+ 
 .screen input::placeholder {
     color: #667;
 }
-
+ 
 .subtitle {
     font-size: 14px;
     color: #667;
     margin-top: -4px;
 }
-
+ 
 /* ===========================
    難易度選択ボタン
    =========================== */
-
+ 
 .difficulty-select {
     display: flex;
     gap: 16px;
@@ -122,7 +123,7 @@ canvas {
     justify-content: center;
     margin-top: 8px;
 }
-
+ 
 .diff-btn {
     width: 180px;
     padding: 18px 16px !important;
@@ -135,22 +136,22 @@ canvas {
     border: 2px solid transparent !important;
     cursor: pointer;
 }
-
+ 
 .diff-btn .diff-icon {
     font-size: 36px;
 }
-
+ 
 .diff-btn .diff-label {
     font-size: 20px;
     font-weight: bold;
 }
-
+ 
 .diff-btn .diff-desc {
     font-size: 13px;
     opacity: 0.8;
     line-height: 1.4;
 }
-
+ 
 /* かんたん */
 .diff-easy {
     background: linear-gradient(135deg, #1a6b3a, #2d9a5a) !important;
@@ -160,7 +161,7 @@ canvas {
     border-color: #4cff8a !important;
     box-shadow: 0 4px 20px rgba(76, 255, 138, 0.3);
 }
-
+ 
 /* ふつう */
 .diff-normal {
     background: linear-gradient(135deg, #b36800, #e08a00) !important;
@@ -170,7 +171,7 @@ canvas {
     border-color: #ffd700 !important;
     box-shadow: 0 4px 20px rgba(255, 215, 0, 0.3);
 }
-
+ 
 /* むずかしい */
 .diff-hard {
     background: linear-gradient(135deg, #8b1a1a, #c0392b) !important;
@@ -180,7 +181,8 @@ canvas {
     border-color: #ff4757 !important;
     box-shadow: 0 4px 20px rgba(255, 71, 87, 0.3);
 }
-
+ 
 .diff-btn.selected {
     transform: scale(1.05);
 }
+ 
