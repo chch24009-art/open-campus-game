@@ -1,21 +1,21 @@
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
-
+ 
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 window.addEventListener("resize", () => {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
 });
-
+ 
 // ゲームの状態: "start" / "input" / "result" / "playing" / "over"
 let state = "start";
 let dead = false;
-
+ 
 // =========================
 // 難易度設定（3パターン）
 // =========================
-
+ 
 const DIFFICULTY = {
     easy: {
         label: "かんたん",
@@ -57,17 +57,17 @@ const DIFFICULTY = {
         bossTime: 12,
     }
 };
-
+ 
 let currentDifficulty = "normal";
 let diff = DIFFICULTY.normal;
-
+ 
 // =========================
 // 背景パーティクル（星空）
 // =========================
-
+ 
 const bgStars = [];
 const bgParticles = [];
-
+ 
 // 星を初期化
 for (let i = 0; i < 120; i++) {
     bgStars.push({
@@ -79,7 +79,7 @@ for (let i = 0; i < 120; i++) {
         twinkleSpeed: Math.random() * 0.03 + 0.01
     });
 }
-
+ 
 // 属性ごとの背景パーティクル色
 const BG_PARTICLE_COLORS = {
     "炎": ["#ff4500", "#ff6b35", "#ffa500", "#ff8c00"],
@@ -88,7 +88,7 @@ const BG_PARTICLE_COLORS = {
     "風": ["#76ff03", "#69f0ae", "#b9f6ca", "#00e676"],
     "ビーム": ["#e040fb", "#ea80fc", "#ce93d8", "#f48fb1"]
 };
-
+ 
 function spawnBgParticle() {
     if (state !== "playing" || bgParticles.length > 40) return;
     let colors = BG_PARTICLE_COLORS[attackType] || ["#ffffff"];
@@ -103,12 +103,12 @@ function spawnBgParticle() {
         color: colors[Math.floor(Math.random() * colors.length)]
     });
 }
-
+ 
 function drawBackground() {
     // 属性に応じたグラデーション背景
     let baseColor1 = "#0a0a1a";
     let baseColor2 = "#0d1025";
-
+ 
     if (state === "playing" || state === "over") {
         const gradColors = {
             "炎": ["#1a0800", "#0d0500"],
@@ -121,7 +121,7 @@ function drawBackground() {
         baseColor1 = gc[0];
         baseColor2 = gc[1];
     }
-
+ 
     let grd = ctx.createRadialGradient(
         canvas.width / 2, canvas.height / 2, 0,
         canvas.width / 2, canvas.height / 2, Math.max(canvas.width, canvas.height) * 0.7
@@ -130,7 +130,7 @@ function drawBackground() {
     grd.addColorStop(1, baseColor2);
     ctx.fillStyle = grd;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-
+ 
     // 瞬く星
     for (let s of bgStars) {
         s.twinkle += s.twinkleSpeed;
@@ -140,7 +140,7 @@ function drawBackground() {
         ctx.arc(s.x % canvas.width, s.y % canvas.height, s.size, 0, Math.PI * 2);
         ctx.fill();
     }
-
+ 
     // 属性パーティクル（プレイ中のみ）
     for (let i = bgParticles.length - 1; i >= 0; i--) {
         let p = bgParticles[i];
@@ -157,11 +157,11 @@ function drawBackground() {
     }
     ctx.globalAlpha = 1;
 }
-
+ 
 // =========================
 // 画面（DOM）を作る
 // =========================
-
+ 
 const ui = document.createElement("div");
 ui.innerHTML = '\
 <div id="startScreen" class="screen">\
@@ -209,7 +209,7 @@ ui.innerHTML = '\
 </div>\
 ';
 document.body.appendChild(ui);
-
+ 
 // 難易度ボタン処理
 document.querySelectorAll(".diff-btn").forEach(function(btn) {
     btn.addEventListener("click", function() {
@@ -219,7 +219,7 @@ document.querySelectorAll(".diff-btn").forEach(function(btn) {
         diff = DIFFICULTY[currentDifficulty];
     });
 });
-
+ 
 function showScreen(id) {
     var screens = document.querySelectorAll(".screen");
     for (var i = 0; i < screens.length; i++) {
@@ -227,17 +227,17 @@ function showScreen(id) {
     }
     if (id) document.getElementById(id).style.display = "flex";
 }
-
+ 
 // =========================
 // サウンド（Web Audio APIで生成、音声ファイル不要）
 // =========================
-
+ 
 let audioCtx = null;
 let masterGain = null;
 let bgmTimer = null;
 let bgmStep = 0;
 let lastKillSound = 0;
-
+ 
 function initAudio() {
     if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -247,7 +247,7 @@ function initAudio() {
     }
     if (audioCtx.state === "suspended") audioCtx.resume();
 }
-
+ 
 // 音を1つ鳴らす（freqからslideToへ音程が変化）
 function tone(freq, dur, type, vol, slideTo, delay) {
     if (!audioCtx) return;
@@ -264,7 +264,7 @@ function tone(freq, dur, type, vol, slideTo, delay) {
     osc.start(t);
     osc.stop(t + dur);
 }
-
+ 
 // ノイズ音（爆発・風など）
 function noise(dur, vol, filterFreq) {
     if (!audioCtx) return;
@@ -286,7 +286,7 @@ function noise(dur, vol, filterFreq) {
     g.connect(masterGain);
     src.start(t);
 }
-
+ 
 // 効果音
 const SFX = {
     "炎": function() { noise(0.25, 0.25, 800); },
@@ -308,7 +308,7 @@ const SFX = {
         [523, 659, 784, 1047].forEach(function(f, i) { tone(f, 0.18, "triangle", 0.25, null, i * 0.15); });
     }
 };
-
+ 
 // 敵撃破音（鳴りすぎ防止つき）
 function playKill() {
     if (!audioCtx) return;
@@ -316,7 +316,7 @@ function playKill() {
     lastKillSound = audioCtx.currentTime;
     SFX.kill();
 }
-
+ 
 // シンプルなループBGM（プレイ中だけ鳴る）
 const BGM_NOTES = [110, 110, 165, 110, 131, 131, 196, 165];
 function startBGM() {
@@ -330,17 +330,17 @@ function startBGM() {
         bgmStep++;
     }, 250);
 }
-
+ 
 // =========================
 // AI生成（攻撃名の分類＋名前生成）
 // =========================
-
+ 
 let attackName = "";
 let attackType = "";
 let attackReason = "";
 let heroName = "";
 let enemyNames = { normal: "", fast: "", tank: "", boss: "" };
-
+ 
 // 各属性のキーワード
 const ELEMENT_KEYWORDS = {
     "炎": ["炎", "火", "ファイヤ", "フレイム", "バーン", "灼", "爆", "熱", "マグマ", "太陽"],
@@ -349,7 +349,7 @@ const ELEMENT_KEYWORDS = {
     "風": ["風", "トルネード", "嵐", "ウインド", "ゲイル", "疾風", "空", "翼", "斬", "刃"],
     "ビーム": ["ビーム", "レーザー", "光", "星", "銀河", "宇宙", "波動", "オーラ", "神", "極"]
 };
-
+ 
 // 母音・語感から属性を推測
 const VOWEL_ELEMENT = {
     "a": "炎",   // 開いた強い響き → 炎
@@ -358,11 +358,11 @@ const VOWEL_ELEMENT = {
     "e": "風",   // 抜ける響き → 風
     "o": "ビーム" // 重く伸びる響き → ビーム
 };
-
+ 
 function keywordReason(name, kw, type) {
     return "入力の中に「" + kw + "」が含まれていたため、" + type + "系と判定しました。";
 }
-
+ 
 const GUESS_REASONS = {
     "炎": ["語感が力強く熱を感じさせるため", "破壊力の高そうな響きを持つため", "勢いのある攻撃的な名前のため"],
     "雷": ["音が鋭くスピード感があるため", "一瞬で決まりそうな切れ味を感じるため", "電撃のような響きを持つため"],
@@ -370,7 +370,7 @@ const GUESS_REASONS = {
     "風": ["軽やかで流れるような響きのため", "素早さを感じさせる名前のため", "空を切るような印象のため"],
     "ビーム": ["どの属性にも寄らない神秘的な響きのため", "エネルギーを凝縮したような語感のため", "未知の力を感じさせる名前のため"]
 };
-
+ 
 function hashString(s) {
     let h = 0;
     for (let i = 0; i < s.length; i++) {
@@ -378,10 +378,10 @@ function hashString(s) {
     }
     return h;
 }
-
+ 
 function classifyAttack(name) {
     let lower = name.toLowerCase();
-
+ 
     // 1. まずキーワードで判定
     for (let type in ELEMENT_KEYWORDS) {
         for (let kw of ELEMENT_KEYWORDS[type]) {
@@ -392,7 +392,7 @@ function classifyAttack(name) {
             }
         }
     }
-
+ 
     // 2. キーワードが無い場合：母音の出現をスコア化
     let scores = { "炎": 0, "雷": 0, "氷": 0, "風": 0, "ビーム": 0 };
     for (let ch of lower) {
@@ -401,7 +401,7 @@ function classifyAttack(name) {
     let h = hashString(name);
     let types = Object.keys(scores);
     scores[types[h % 5]] += 0.5;
-
+ 
     let best = "ビーム";
     let bestScore = -1;
     for (let type of types) {
@@ -410,12 +410,12 @@ function classifyAttack(name) {
             best = type;
         }
     }
-
+ 
     attackType = best;
     let reasons = GUESS_REASONS[best];
     attackReason = reasons[h % reasons.length] + "、" + best + "系と判定しました。";
 }
-
+ 
 const HERO_TITLES = {
     "炎": ["紅蓮の勇者", "灼熱の剣士", "炎帝"],
     "雷": ["迅雷の剣士", "雷鳴の勇者", "紫電の使い手"],
@@ -424,7 +424,7 @@ const HERO_TITLES = {
     "ビーム": ["星光の戦士", "銀河の守護者", "光速の勇者"]
 };
 const HERO_NAMES = ["レン", "ソラ", "カイ", "ユウキ", "アカリ", "ヒカル", "ミナト", "リク", "ツバサ", "ハヤテ"];
-
+ 
 // 属性ごとの主人公の見た目とオーラの色
 const HERO_EMOJI = {
     "炎": "🦸",
@@ -441,7 +441,7 @@ const ELEMENT_COLORS = {
     "ビーム": "magenta"
 };
 let heroEmoji = "🚀";
-
+ 
 const ENEMY_ADJ = ["漆黒の", "混沌の", "深淵の", "暴走", "呪われし", "鋼鉄の", "冥界の", "狂乱の"];
 const ENEMY_NOUN = {
     normal: ["インベーダー", "スライム", "ウォッチャー", "クリーパー"],
@@ -449,11 +449,11 @@ const ENEMY_NOUN = {
     tank: ["オーガ", "ゴーレム", "ベヒーモス", "ジャガーノート"],
     boss: ["竜王", "魔竜", "終焉竜", "冥竜"]
 };
-
+ 
 function pick(arr) {
     return arr[Math.floor(Math.random() * arr.length)];
 }
-
+ 
 function generateNames() {
     heroName = pick(HERO_TITLES[attackType]) + "・" + pick(HERO_NAMES);
     heroEmoji = HERO_EMOJI[attackType];
@@ -462,7 +462,7 @@ function generateNames() {
     enemyNames.tank = pick(ENEMY_ADJ) + pick(ENEMY_NOUN.tank);
     enemyNames.boss = pick(ENEMY_ADJ) + pick(ENEMY_NOUN.boss);
 }
-
+ 
 function getTitle(s) {
     if (s >= 750) return "👑 AI界の神";
     if (s >= 725) return "🌌 伝説を超えし者";
@@ -477,11 +477,11 @@ function getTitle(s) {
     if (s >= 500) return "🐣 ひよっこ冒険者";
     return "💀 まだまだ修行中";
 }
-
+ 
 // =========================
 // 画面フロー
 // =========================
-
+ 
 document.getElementById("startBtn").addEventListener("click", function() {
     initAudio();
     diff = DIFFICULTY[currentDifficulty];
@@ -489,20 +489,20 @@ document.getElementById("startBtn").addEventListener("click", function() {
     showScreen("inputScreen");
     document.getElementById("attackInput").focus();
 });
-
+ 
 async function decide() {
     let name = document.getElementById("attackInput").value.trim();
-
+ 
     if (!name) {
         name = "ファイヤーブレイク";
     }
-
+ 
     attackName = name;
-
+ 
     let btn = document.getElementById("decideBtn");
     btn.textContent = "AIが考え中…";
     btn.disabled = true;
-
+ 
     try {
         const response = await fetch("https://open-campus-server.onrender.com/classify", {
             method: "POST",
@@ -513,26 +513,26 @@ async function decide() {
                 attackName: attackName
             })
         });
-
+ 
         if (!response.ok) {
             throw new Error("サーバーエラー");
         }
-
+ 
         const data = await response.json();
-
+ 
         console.log(data);
-
+ 
         attackType = data.attackType;
         attackReason = data.reason;
-
+ 
     } catch (error) {
         // サーバー接続失敗時はローカル分類にフォールバック
         console.warn("サーバー接続失敗、ローカル分類を使用:", error);
         classifyAttack(attackName);
     }
-
+ 
     generateNames();
-
+ 
     document.getElementById("genHeroEmoji").textContent = heroEmoji;
     document.getElementById("genHero").textContent = "主人公名：" + heroName;
     document.getElementById("genAttack").textContent = "攻撃タイプ：" + attackType + "系（" + attackName + "）";
@@ -541,19 +541,19 @@ async function decide() {
     document.getElementById("genEnemy2").textContent = "敵キャラ名2：👻 " + enemyNames.fast;
     document.getElementById("genEnemy3").textContent = "敵キャラ名3：👹 " + enemyNames.tank;
     document.getElementById("genDiff").textContent = "難易度：" + diff.label + "（" + diff.totalTime + "秒）";
-
+ 
     state = "result";
     showScreen("resultScreen");
-
+ 
     btn.textContent = "決定";
     btn.disabled = false;
 }
-
+ 
 document.getElementById("decideBtn").addEventListener("click", decide);
 document.getElementById("attackInput").addEventListener("keydown", function(e) {
     if (e.key === "Enter") decide();
 });
-
+ 
 document.getElementById("playBtn").addEventListener("click", function() {
     showScreen(null);
     if (document.activeElement) document.activeElement.blur();
@@ -563,11 +563,11 @@ document.getElementById("playBtn").addEventListener("click", function() {
     state = "playing";
     startSpawnTimer();
 });
-
+ 
 // =========================
 // ゲームデータ
 // =========================
-
+ 
 let player = {};
 let drones = [];
 let enemies = [];
@@ -576,17 +576,17 @@ let bullets = [];
 let popups = [];
 let items = [];
 let keys = {};
-
+ 
 let weaponCooldown = 0;
 let score = 0;
 let timeLeft = 60;
 let bossSpawned = false;
 let bossWarn = 0;
-
+ 
 const DRONE_ORBIT = 70;
 const DRONE_FIRE_RATE = 30;
 const BULLET_DAMAGE = 3;
-
+ 
 function resetGame() {
     player = {
         x: canvas.width / 2,
@@ -613,23 +613,23 @@ function resetGame() {
     bossWarn = 0;
     dead = false;
 }
-
+ 
 // =========================
 // 入力
 // =========================
-
+ 
 // e.code（物理キー）で判定するので、日本語入力がONのままでも動く
 document.addEventListener("keydown", function(e) {
     if (e.target.tagName === "INPUT") return;
     keys[e.code] = true;
     if (state === "playing") e.preventDefault();
 });
-
+ 
 document.addEventListener("keyup", function(e) {
     if (e.target.tagName === "INPUT") return;
     keys[e.code] = false;
 });
-
+ 
 canvas.addEventListener("click", function() {
     if (state === "over") {
         document.getElementById("attackInput").value = "";
@@ -640,17 +640,17 @@ canvas.addEventListener("click", function() {
         showScreen("startScreen");
     }
 });
-
+ 
 // =========================
 // 敵
 // =========================
-
+ 
 function spawnEnemy() {
-    if (enemies.length > 150) return;
-
+    if (enemies.length > 60) return;
+ 
     let side = Math.floor(Math.random() * 4);
     let x, y;
-
+ 
     if (side === 0) {
         x = Math.random() * canvas.width; y = -30;
     } else if (side === 1) {
@@ -660,7 +660,7 @@ function spawnEnemy() {
     } else {
         x = canvas.width + 30; y = Math.random() * canvas.height;
     }
-
+ 
     let elapsed = diff.totalTime - timeLeft;
     let r = Math.random();
     let type;
@@ -671,7 +671,7 @@ function spawnEnemy() {
     } else {
         type = { emoji: "👾", size: 30, speed: 2.5 * diff.enemySpeedMult, hp: 3 * diff.enemyHpMult, dmg: 0.15, point: 1 };
     }
-
+ 
     enemies.push({
         x: x, y: y,
         size: type.size, speed: type.speed,
@@ -681,7 +681,7 @@ function spawnEnemy() {
         hitCooldown: 0, slowTime: 0
     });
 }
-
+ 
 function spawnBoss() {
     bossWarn = 90;
     SFX.bossWarn();
@@ -694,20 +694,20 @@ function spawnBoss() {
         hitCooldown: 0, slowTime: 0
     });
 }
-
+ 
 function addPopup(x, y, text) {
     popups.push({ x: x, y: y, text: text, life: 40 });
 }
-
+ 
 function damageEnemy(index, dmg) {
     let e = enemies[index];
     e.hp -= dmg;
     addPopup(e.x + e.size / 2, e.y, dmg);
-
+ 
     if (e.hp <= 0) {
         let dropX = e.x + e.size / 2;
         let dropY = e.y + e.size / 2;
-
+ 
         // 通常敵は5%、ボスは100%で回復アイテムを落とす
         if (e.boss || Math.random() < 0.05) {
             items.push({
@@ -723,10 +723,10 @@ function damageEnemy(index, dmg) {
         playKill();
     }
 }
-
+ 
 function playerCenterX() { return player.x + player.size / 2; }
 function playerCenterY() { return player.y + player.size / 2; }
-
+ 
 function nearestEnemy(x, y) {
     let best = null;
     let bestDist = Infinity;
@@ -741,12 +741,26 @@ function nearestEnemy(x, y) {
     }
     return best;
 }
-
-// ターゲティングAI：群れの中心を探す
+ 
+// ターゲティングAI：群れの中心を探す（フレームキャッシュ付き）
+let cachedDensest = null;
+let cachedDensestFrame = -1;
+let frameCount = 0;
+ 
 function densestEnemy() {
+    if (cachedDensestFrame === frameCount) return cachedDensest;
+    cachedDensestFrame = frameCount;
+ 
+    // 敵が多いときはサンプリングで高速化
+    let sample = enemies;
+    if (enemies.length > 30) {
+        sample = [];
+        for (let i = 0; i < enemies.length; i += 3) sample.push(enemies[i]);
+    }
+ 
     let best = null;
     let bestCount = -1;
-    for (let e of enemies) {
+    for (let e of sample) {
         let count = 0;
         for (let o of enemies) {
             let dx = o.x - e.x;
@@ -758,19 +772,20 @@ function densestEnemy() {
             best = e;
         }
     }
+    cachedDensest = best;
     return best;
 }
-
+ 
 // =========================
 // 属性攻撃（技名で決まる）
 // =========================
-
+ 
 function createAttack() {
     let cx = playerCenterX();
     let cy = playerCenterY();
-
+ 
     if (SFX[attackType]) SFX[attackType]();
-
+ 
     if (attackType === "炎") {
         createFireAttack(cx, cy);
     } else if (attackType === "雷") {
@@ -783,12 +798,12 @@ function createAttack() {
         createBeamAttack(cx, cy);
     }
 }
-
+ 
 // 炎：敵が密集している方向へ扇状に火の玉（威力3）
 function createFireAttack(x, y) {
     let target = densestEnemy();
     let baseAngle;
-
+ 
     if (target) {
         baseAngle = Math.atan2(
             (target.y + target.size / 2) - y,
@@ -797,7 +812,7 @@ function createFireAttack(x, y) {
     } else {
         baseAngle = Math.random() * Math.PI * 2;
     }
-
+ 
     for (let i = 0; i < 8; i++) {
         let angle = baseAngle + (i - 3.5) / 7 * (Math.PI * 2 / 3);
         attacks.push({
@@ -809,15 +824,15 @@ function createFireAttack(x, y) {
         });
     }
 }
-
+ 
 // 雷：群れの中心付近の敵5体に落雷（威力4）
 function createLightningAttack(x, y) {
     let center = densestEnemy();
     if (!center) return;
-
+ 
     let cx = center.x;
     let cy = center.y;
-
+ 
     let targets = [...enemies]
         .sort(function(a, b) {
             let da = Math.hypot(a.x - cx, a.y - cy);
@@ -825,7 +840,7 @@ function createLightningAttack(x, y) {
             return da - db;
         })
         .slice(0, 5);
-
+ 
     for (let target of targets) {
         attacks.push({
             type: "lightning",
@@ -834,14 +849,14 @@ function createLightningAttack(x, y) {
             endY: target.y + target.size / 2,
             life: 12
         });
-
+ 
         let index = enemies.indexOf(target);
         if (index !== -1) {
             damageEnemy(index, 4);
         }
     }
 }
-
+ 
 // 氷：12方向に氷弾（威力1＋敵を遅くする）
 function createIceAttack(x, y) {
     for (let i = 0; i < 12; i++) {
@@ -855,7 +870,7 @@ function createIceAttack(x, y) {
         });
     }
 }
-
+ 
 // 風：広がる竜巻（威力2）
 function createWindAttack(x, y) {
     attacks.push({
@@ -864,25 +879,25 @@ function createWindAttack(x, y) {
         radius: 20, maxRadius: 180, life: 45
     });
 }
-
+ 
 // ビーム：敵が密集している方向へ貫通ビーム（威力4）
 function createBeamAttack(x, y) {
     let target = densestEnemy();
     if (!target) return;
-
+ 
     let dx = (target.x + target.size / 2) - x;
     let dy = (target.y + target.size / 2) - y;
     let dist = Math.sqrt(dx * dx + dy * dy);
     let ux = dx / dist;
     let uy = dy / dist;
-
+ 
     attacks.push({
         type: "beam",
         startX: x, startY: y,
         endX: x + ux * 2000, endY: y + uy * 2000,
         life: 15
     });
-
+ 
     for (let i = enemies.length - 1; i >= 0; i--) {
         let ex = (enemies[i].x + enemies[i].size / 2) - x;
         let ey = (enemies[i].y + enemies[i].size / 2) - y;
@@ -893,17 +908,17 @@ function createBeamAttack(x, y) {
         }
     }
 }
-
+ 
 // =========================
 // AIドローン
 // =========================
-
+ 
 function updateDrones() {
     for (let d of drones) {
         d.angle += 0.05;
         d.x = playerCenterX() + Math.cos(d.angle) * DRONE_ORBIT;
         d.y = playerCenterY() + Math.sin(d.angle) * DRONE_ORBIT;
-
+ 
         d.cooldown--;
         if (d.cooldown <= 0) {
             let target = (d === drones[0])
@@ -923,70 +938,83 @@ function updateDrones() {
         }
     }
 }
-
+ 
 // =========================
 // 更新
 // =========================
-
+ 
 function update() {
     if (state !== "playing") return;
-
+ 
+    frameCount++;
+ 
+    // 画面外に大きくはみ出した敵を除去（軽量化）
+    let margin = 400;
+    for (let i = enemies.length - 1; i >= 0; i--) {
+        let e = enemies[i];
+        if (e.x < -margin || e.x > canvas.width + margin ||
+            e.y < -margin || e.y > canvas.height + margin) {
+            enemies.splice(i, 1);
+        }
+    }
+ 
     // 背景パーティクル生成
     if (Math.random() < 0.15) spawnBgParticle();
-
+ 
     if (keys["KeyW"] || keys["ArrowUp"]) player.y -= player.speed;
     if (keys["KeyS"] || keys["ArrowDown"]) player.y += player.speed;
     if (keys["KeyA"] || keys["ArrowLeft"]) player.x -= player.speed;
     if (keys["KeyD"] || keys["ArrowRight"]) player.x += player.speed;
-
+ 
     player.x = Math.max(0, Math.min(canvas.width - player.size, player.x));
     player.y = Math.max(0, Math.min(canvas.height - player.size, player.y));
-
+ 
     for (let enemy of enemies) {
         let sp = enemy.speed;
         if (enemy.slowTime > 0) {
             enemy.slowTime--;
             sp = enemy.speed * 0.4;
         }
-
+ 
         let dx = player.x - enemy.x;
         let dy = player.y - enemy.y;
         let distance = Math.sqrt(dx * dx + dy * dy);
-
+ 
         if (distance > 0) {
             enemy.x += dx / distance * sp;
             enemy.y += dy / distance * sp;
         }
-
+ 
         if (distance < (player.size + enemy.size) / 2) {
             player.hp -= enemy.dmg;
         }
-
+ 
         if (enemy.hitCooldown > 0) enemy.hitCooldown--;
     }
-
+ 
     if (player.hp <= 0) {
         player.hp = 0;
         dead = true;
         state = "over";
         SFX.gameover();
+        if (spawnTimer) { clearInterval(spawnTimer); spawnTimer = null; }
     }
-
+ 
     weaponCooldown--;
     if (weaponCooldown <= 0) {
         createAttack();
         weaponCooldown = diff.weaponCooldown;
     }
-
+ 
     updateDrones();
-
+ 
     for (let a of attacks) {
         a.life--;
-
+ 
         if (a.type === "fire" || a.type === "ice") {
             a.x += a.vx;
             a.y += a.vy;
-
+ 
             for (let j = enemies.length - 1; j >= 0; j--) {
                 let ex = (enemies[j].x + enemies[j].size / 2) - a.x;
                 let ey = (enemies[j].y + enemies[j].size / 2) - a.y;
@@ -998,11 +1026,11 @@ function update() {
                 }
             }
         }
-
+ 
         if (a.type === "wind") {
             a.radius += 4;
             if (a.radius > a.maxRadius) a.life = 0;
-
+ 
             for (let j = enemies.length - 1; j >= 0; j--) {
                 let e = enemies[j];
                 if (e.hitCooldown > 0) continue;
@@ -1018,13 +1046,13 @@ function update() {
         }
     }
     attacks = attacks.filter(function(a) { return a.life > 0; });
-
+ 
     for (let i = bullets.length - 1; i >= 0; i--) {
         let b = bullets[i];
         b.x += b.vx;
         b.y += b.vy;
         b.life--;
-
+ 
         let hit = false;
         for (let j = enemies.length - 1; j >= 0; j--) {
             let dx = (enemies[j].x + enemies[j].size / 2) - b.x;
@@ -1037,7 +1065,7 @@ function update() {
         }
         if (hit || b.life <= 0) bullets.splice(i, 1);
     }
-
+ 
     // 回復アイテム
     for (let i = items.length - 1; i >= 0; i--) {
         let item = items[i];
@@ -1045,7 +1073,7 @@ function update() {
         let dx = playerCenterX() - item.x;
         let dy = playerCenterY() - item.y;
         let distance = Math.hypot(dx, dy);
-
+ 
         if (distance < player.size / 2 + item.size / 2) {
             let oldHp = player.hp;
             player.hp = Math.min(player.maxHp, player.hp + item.heal);
@@ -1056,26 +1084,26 @@ function update() {
             items.splice(i, 1);
             continue;
         }
-
+ 
         if (item.life <= 0) {
             items.splice(i, 1);
         }
     }
-
+ 
     for (let p of popups) { p.y -= 1; p.life--; }
     popups = popups.filter(function(p) { return p.life > 0; });
-
+ 
     if (bossWarn > 0) bossWarn--;
 }
-
+ 
 // =========================
 // 描画
 // =========================
-
+ 
 function drawGame() {
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
-
+ 
     for (let a of attacks) {
         if (a.type === "fire") {
             ctx.fillStyle = "orange";
@@ -1115,7 +1143,7 @@ function drawGame() {
             ctx.globalAlpha = 1;
         }
     }
-
+ 
     // プレイヤー（属性色のオーラ付き）
     ctx.fillStyle = ELEMENT_COLORS[attackType] || "white";
     ctx.globalAlpha = 0.25;
@@ -1123,10 +1151,10 @@ function drawGame() {
     ctx.arc(playerCenterX(), playerCenterY(), player.size * 0.9, 0, Math.PI * 2);
     ctx.fill();
     ctx.globalAlpha = 1;
-
+ 
     ctx.font = player.size + "px sans-serif";
     ctx.fillText(heroEmoji, playerCenterX(), playerCenterY());
-
+ 
     // HPバー（残量に応じて色が変わる）
     let barW = 60;
     let bx = playerCenterX() - barW / 2;
@@ -1142,14 +1170,14 @@ function drawGame() {
         ctx.fillStyle = "#f44336";
     }
     ctx.fillRect(bx, by, barW * hpRatio, 8);
-
+ 
     // 敵
     for (let e of enemies) {
         ctx.font = e.size + "px sans-serif";
         ctx.globalAlpha = e.slowTime > 0 ? 0.6 : 1;
         ctx.fillText(e.emoji, e.x + e.size / 2, e.y + e.size / 2);
         ctx.globalAlpha = 1;
-
+ 
         if (e.boss) {
             let bw = 100;
             ctx.fillStyle = "rgba(0,0,0,0.6)";
@@ -1158,7 +1186,7 @@ function drawGame() {
             ctx.fillRect(e.x + e.size / 2 - bw / 2, e.y - 20, bw * (e.hp / e.maxHp), 8);
         }
     }
-
+ 
     // 回復アイテム
     ctx.font = "30px sans-serif";
     ctx.textAlign = "center";
@@ -1169,13 +1197,13 @@ function drawGame() {
         }
         ctx.fillText("❤️", item.x, item.y);
     }
-
+ 
     // ドローン
     ctx.font = "30px sans-serif";
     for (let d of drones) {
         ctx.fillText("🤖", d.x, d.y);
     }
-
+ 
     // ドローンの弾
     ctx.fillStyle = "yellow";
     for (let b of bullets) {
@@ -1183,7 +1211,7 @@ function drawGame() {
         ctx.arc(b.x, b.y, b.size, 0, Math.PI * 2);
         ctx.fill();
     }
-
+ 
     // ダメージ数字
     ctx.font = "bold 22px sans-serif";
     for (let p of popups) {
@@ -1192,14 +1220,14 @@ function drawGame() {
         ctx.fillText(p.text, p.x, p.y);
     }
     ctx.globalAlpha = 1;
-
+ 
     ctx.textAlign = "left";
     ctx.textBaseline = "alphabetic";
-
+ 
     // HUD背景
     ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
     ctx.fillRect(10, 10, 380, 150);
-
+ 
     // 情報表示
     ctx.fillStyle = "white";
     ctx.font = "24px sans-serif";
@@ -1210,7 +1238,7 @@ function drawGame() {
     ctx.font = "16px sans-serif";
     ctx.fillStyle = "#aab";
     ctx.fillText("難易度: " + diff.label, 20, 148);
-
+ 
     // ボス出現の警告
     if (bossWarn > 0) {
         ctx.textAlign = "center";
@@ -1222,26 +1250,26 @@ function drawGame() {
         ctx.textAlign = "left";
     }
 }
-
+ 
 function drawOver() {
     drawGame();
-
+ 
     ctx.fillStyle = "rgba(0, 0, 0, 0.75)";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-
+ 
     ctx.fillStyle = "white";
     ctx.textAlign = "center";
-
+ 
     ctx.font = "50px sans-serif";
     ctx.fillText(dead ? "GAME OVER" : "SURVIVED!", canvas.width / 2, canvas.height / 2 - 120);
-
+ 
     ctx.font = "36px sans-serif";
     ctx.fillText("SCORE: " + score, canvas.width / 2, canvas.height / 2 - 60);
-
+ 
     ctx.font = "32px sans-serif";
     ctx.fillStyle = "gold";
     ctx.fillText("称号：" + getTitle(score), canvas.width / 2, canvas.height / 2 - 10);
-
+ 
     ctx.fillStyle = "white";
     ctx.font = "24px sans-serif";
     ctx.fillText("主人公：" + heroName + "　技：" + attackName, canvas.width / 2, canvas.height / 2 + 40);
@@ -1251,36 +1279,36 @@ function drawOver() {
     ctx.fillStyle = "white";
     ctx.font = "22px sans-serif";
     ctx.fillText("クリックでタイトルへ", canvas.width / 2, canvas.height / 2 + 110);
-
+ 
     ctx.textAlign = "left";
 }
-
+ 
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawBackground();
-
+ 
     if (state === "playing") {
         drawGame();
     } else if (state === "over") {
         drawOver();
     }
 }
-
+ 
 // =========================
 // メインループ
 // =========================
-
+ 
 function gameLoop() {
     update();
     draw();
     requestAnimationFrame(gameLoop);
 }
-
+ 
 gameLoop();
-
+ 
 // 敵スポーンタイマー（難易度で間隔・数が変わる）
 let spawnTimer = null;
-
+ 
 function startSpawnTimer() {
     if (spawnTimer) clearInterval(spawnTimer);
     spawnTimer = setInterval(function() {
@@ -1291,25 +1319,26 @@ function startSpawnTimer() {
         }
     }, diff.spawnInterval);
 }
-
-// 初回のスポーンタイマーを開始
-startSpawnTimer();
-
+ 
+// スポーンタイマーはplayBtn押下時にのみ開始（重複防止）
+ 
 // 1秒ごとのタイマー
 setInterval(function() {
     if (state === "playing") {
         timeLeft--;
-
+ 
         // 残りbossTime秒でボス出現
         if (timeLeft === diff.bossTime && !bossSpawned) {
             bossSpawned = true;
             spawnBoss();
         }
-
+ 
         if (timeLeft <= 0) {
             timeLeft = 0;
             state = "over";
             SFX.survived();
+            if (spawnTimer) { clearInterval(spawnTimer); spawnTimer = null; }
         }
     }
 }, 1000);
+ 
