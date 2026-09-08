@@ -2756,12 +2756,6 @@ function drawDrones() {
 
         ctx.shadowBlur = 0;
 
-        ctx.font = "18px Arial";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillStyle = "#111";
-        ctx.fillText("AI", 0, 1);
-
         ctx.restore();
     }
 }
