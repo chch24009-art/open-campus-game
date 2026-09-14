@@ -172,7 +172,7 @@ function drawBackground() {
 // =========================
  
 const ui = document.createElement("div");
-ui.innerHTML = '
+ui.innerHTML = `
 <div id="startScreen" class="screen">\
     <h1>生成AIサバイバルゲーム</h1>\
     <p>攻撃名を入力して、AIが決めた攻撃で敵を倒そう！</p>\
