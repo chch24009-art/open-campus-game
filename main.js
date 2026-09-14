@@ -200,7 +200,7 @@ ui.innerHTML = '\
 \
 <div id="inputScreen" class="screen" style="display:none">\
     <h2>攻撃名を入力してください</h2>\
-    <input id="attackInput" placeholder="例：ファイヤーブレイク" maxlength="20">\
+    <input id="attackInput" placeholder="例：ファイヤーブレイク" maxlength="20" autocomplete="off">\
     <button id="decideBtn">決定</button>\
 </div>\
 \
